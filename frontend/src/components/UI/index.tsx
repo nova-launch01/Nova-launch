@@ -2,3 +2,8 @@ export { Button } from './Button';
 export { Input } from './Input';
 export { Card } from './Card';
 export { Spinner } from './Spinner';
+export { Tooltip } from './Tooltip';
+export { ErrorBoundary } from './ErrorBoundary';
+export { Toast } from './Toast';
+export { Skeleton, SkeletonCard } from './Skeleton';
+export { Modal } from './Modal';

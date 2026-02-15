@@ -25,6 +25,10 @@ Thumbs.db
 *.log
 npm-debug.log*
 
+# Documentation (exclude markdown files)
+*.md
+!README.md
+
 # Documentation (excluding README.md and design.md)
 *.md
 !README.md
