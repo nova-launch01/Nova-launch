@@ -157,6 +157,7 @@ export class IpfsService {
     /**
      * Mock metadata upload for development
      */
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     private mockUploadMetadata(metadata: TokenMetadata): IpfsUploadResult {
         const mockCid = `mock-metadata-${Date.now()}`;
         return {

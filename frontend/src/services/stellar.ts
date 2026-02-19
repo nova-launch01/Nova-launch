@@ -1,5 +1,4 @@
 import type { TokenDeployParams, DeploymentResult, TokenInfo } from '../types';
-import { getNetworkConfig, STELLAR_CONFIG } from '../config/stellar';
 
 /**
  * Service for interacting with Stellar smart contracts
@@ -15,8 +14,6 @@ export class StellarService {
      * Deploy a new token to the Stellar network
      */
     async deployToken(params: TokenDeployParams): Promise<DeploymentResult> {
-        const networkConfig = getNetworkConfig(this.network);
-
         // Validate required params
         if (!params.name || !params.symbol || !params.adminWallet) {
             throw new Error('Missing required parameters');
@@ -33,7 +30,7 @@ export class StellarService {
 
         // Generate mock deployment result
         const tokenAddress = this.generateMockTokenAddress();
-        const transactionHash = this.generateMockTransactionHash();
+        const txHash = this.generateMockTransactionHash();
         
         // Calculate fees (mock)
         const baseFee = 100; // stroops
@@ -42,7 +39,7 @@ export class StellarService {
 
         return {
             tokenAddress,
-            transactionHash,
+            transactionHash: txHash,
             totalFee,
             timestamp: Date.now(),
         };
@@ -85,7 +82,8 @@ export class StellarService {
     /**
      * Wait for transaction confirmation
      */
-    async waitForConfirmation(transactionHash: string): Promise<boolean> {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    async waitForConfirmation(_transactionHash: string): Promise<boolean> {
         // In a real implementation, this would poll the RPC endpoint
         await new Promise(resolve => setTimeout(resolve, 1500));
         return true;
@@ -94,7 +92,8 @@ export class StellarService {
     /**
      * Check if wallet is connected and has sufficient balance
      */
-    async checkWalletBalance(address: string): Promise<{ sufficient: boolean; balance: string }> {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    async checkWalletBalance(_address: string): Promise<{ sufficient: boolean; balance: string }> {
         // In a real implementation, this would check the wallet balance
         return {
             sufficient: true,

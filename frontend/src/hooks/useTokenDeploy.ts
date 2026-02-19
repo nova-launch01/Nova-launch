@@ -213,7 +213,7 @@ export function useTokenDeploy(options: UseTokenDeployOptions = {}) {
             setError(appError);
             return null;
         }
-    }, [state.status, network, stellarService, ipfsService, setError, onSuccess, onError]);
+    }, [state.status, stellarService, ipfsService, setError, onSuccess]);
 
     /**
      * Retry the deployment
