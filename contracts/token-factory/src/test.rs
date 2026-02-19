@@ -42,7 +42,7 @@ fn test_cannot_initialize_twice() {
 fn test_update_fees() {
     let env = Env::default();
     env.mock_all_auths();
-    
+
     let contract_id = env.register_contract(None, TokenFactory);
     let client = TokenFactoryClient::new(&env, &contract_id);
 

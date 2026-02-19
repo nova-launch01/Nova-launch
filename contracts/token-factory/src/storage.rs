@@ -34,10 +34,7 @@ pub fn set_base_fee(env: &Env, fee: i128) {
 }
 
 pub fn get_metadata_fee(env: &Env) -> i128 {
-    env.storage()
-        .instance()
-        .get(&DataKey::MetadataFee)
-        .unwrap()
+    env.storage().instance().get(&DataKey::MetadataFee).unwrap()
 }
 
 pub fn set_metadata_fee(env: &Env, fee: i128) {
