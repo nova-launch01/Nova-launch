@@ -33,16 +33,47 @@ fn test_cannot_initialize_twice() {
 
     let admin = Address::generate(&env);
     let treasury = Address::generate(&env);
+    let base_fee = 70_000_000;
+    let metadata_fee = 30_000_000;
 
+    // First initialization succeeds
+    client.initialize(&admin, &treasury, &base_fee, &metadata_fee);
+    
+    // Verify initial state is set correctly
+    let state = client.get_state();
+    assert_eq!(state.admin, admin);
+    assert_eq!(state.treasury, treasury);
+    assert_eq!(state.base_fee, base_fee);
+    assert_eq!(state.metadata_fee, metadata_fee);
+
+    // Second initialization should panic with AlreadyInitialized error (#6)
     client.initialize(&admin, &treasury, &70_000_000, &30_000_000);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #6)")]
+fn test_cannot_initialize_twice_with_different_params() {
+    let env = Env::default();
+    let contract_id = env.register_contract(None, TokenFactory);
+    let client = TokenFactoryClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    let treasury = Address::generate(&env);
+    let different_admin = Address::generate(&env);
+    let different_treasury = Address::generate(&env);
+
+    // First initialization succeeds
     client.initialize(&admin, &treasury, &70_000_000, &30_000_000);
+
+    // Attempt to initialize with different parameters should also fail
+    client.initialize(&different_admin, &different_treasury, &100_000_000, &50_000_000);
 }
 
 #[test]
 fn test_update_fees() {
     let env = Env::default();
     env.mock_all_auths();
-    
+
     let contract_id = env.register_contract(None, TokenFactory);
     let client = TokenFactoryClient::new(&env, &contract_id);
 
@@ -67,7 +98,7 @@ fn test_update_fees() {
 fn test_create_token() {
     let env = Env::default();
     env.mock_all_auths();
-    
+
     let contract_id = env.register_contract(None, TokenFactory);
     let client = TokenFactoryClient::new(&env, &contract_id);
 
@@ -137,7 +168,7 @@ fn test_create_token() {
 fn test_create_token_without_metadata() {
     let env = Env::default();
     env.mock_all_auths();
-    
+
     let contract_id = env.register_contract(None, TokenFactory);
     let client = TokenFactoryClient::new(&env, &contract_id);
 
@@ -155,7 +186,7 @@ fn test_create_token_without_metadata() {
     let symbol = String::from_str(&env, "SMPL");
     let decimals = 7u32;
     let initial_supply = 500_000_0000000i128;
-    let metadata_uri = None;
+    let metadata_uri: Option<String> = None;
 
     // Only base fee required when no metadata
     let expected_fee = base_fee;
@@ -174,7 +205,7 @@ fn test_create_token_without_metadata() {
 
     // Verify token deployed
     // assert!(token_address != Address::generate(&env));
-    
+
     // Verify token info has no metadata
     // let token_info = client.get_token_info(&0).unwrap();
     // assert_eq!(token_info.metadata_uri, None);
@@ -186,7 +217,7 @@ fn test_create_token_without_metadata() {
 fn test_create_token_insufficient_fee() {
     let env = Env::default();
     env.mock_all_auths();
-    
+
     let contract_id = env.register_contract(None, TokenFactory);
     let client = TokenFactoryClient::new(&env, &contract_id);
 
@@ -224,7 +255,7 @@ fn test_create_token_insufficient_fee() {
 fn test_create_token_invalid_parameters() {
     let env = Env::default();
     env.mock_all_auths();
-    
+
     let contract_id = env.register_contract(None, TokenFactory);
     let client = TokenFactoryClient::new(&env, &contract_id);
 
@@ -234,11 +265,11 @@ fn test_create_token_invalid_parameters() {
 
     client.initialize(&admin, &treasury, &70_000_000, &30_000_000);
 
-    let name = String::from_str(&env, "");  // Empty name - invalid
+    let name = String::from_str(&env, ""); // Empty name - invalid
     let symbol = String::from_str(&env, "TEST");
     let decimals = 7u32;
     let initial_supply = 1_000_000_0000000i128;
-    let metadata_uri = None;
+    let metadata_uri: Option<String> = None;
 
     // TODO: Uncomment once create_token is implemented
     // This should panic with InvalidParameters error

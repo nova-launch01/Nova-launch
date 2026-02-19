@@ -12,23 +12,23 @@ export function isValidStellarAddress(address: string): boolean {
 }
 
 /**
- * Validate token name (1-32 characters, alphanumeric + spaces)
+ * Validate token name (1-32 characters, alphanumeric + spaces + hyphens)
  */
 export function isValidTokenName(name: string): boolean {
     if (!name || name.length < 1 || name.length > 32) {
         return false;
     }
-    return /^[a-zA-Z0-9\s]+$/.test(name);
+    return /^[a-zA-Z0-9\s-]+$/.test(name);
 }
 
 /**
- * Validate token symbol (1-12 characters, uppercase letters)
+ * Validate token symbol (1-12 characters, uppercase alphanumeric)
  */
 export function isValidTokenSymbol(symbol: string): boolean {
     if (!symbol || symbol.length < 1 || symbol.length > 12) {
         return false;
     }
-    return /^[A-Z]+$/.test(symbol);
+    return /^[A-Z0-9]+$/.test(symbol);
 }
 
 /**

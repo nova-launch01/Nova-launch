@@ -29,7 +29,8 @@ npm-debug.log*
 *.md
 !README.md
 
-# Documentation (excluding README.md and design.md)
+# Documentation (excluding README.md, design.md, and TESTING.md)
 *.md
 !README.md
 !.nova/specs/stellar-token-deployer/design.md
+!contracts/token-factory/TESTING.md

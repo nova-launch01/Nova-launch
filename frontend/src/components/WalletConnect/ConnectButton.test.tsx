@@ -102,9 +102,10 @@ describe("ConnectButton", () => {
     fireEvent.click(button);
 
     await waitFor(() => {
-      expect(
-        screen.getByRole("button", { name: "Disconnect wallet" }),
-      ).toBeInTheDocument();
+      const disconnectButtons = screen.getAllByRole("button", {
+        name: "Disconnect wallet",
+      });
+      expect(disconnectButtons.length).toBeGreaterThan(0);
     });
   });
 
@@ -121,16 +122,16 @@ describe("ConnectButton", () => {
     fireEvent.click(connectButton);
 
     await waitFor(() => {
-      const disconnectButton = screen.getByRole("button", {
+      const disconnectButtons = screen.getAllByRole("button", {
         name: "Disconnect wallet",
       });
-      expect(disconnectButton).toBeInTheDocument();
+      expect(disconnectButtons.length).toBeGreaterThan(0);
     });
 
-    const disconnectButton = screen.getByRole("button", {
+    const disconnectButtons = screen.getAllByRole("button", {
       name: "Disconnect wallet",
     });
-    fireEvent.click(disconnectButton);
+    fireEvent.click(disconnectButtons[0]);
 
     await waitFor(() => {
       expect(

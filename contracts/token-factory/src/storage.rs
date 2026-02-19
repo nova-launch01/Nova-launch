@@ -34,10 +34,7 @@ pub fn set_base_fee(env: &Env, fee: i128) {
 }
 
 pub fn get_metadata_fee(env: &Env) -> i128 {
-    env.storage()
-        .instance()
-        .get(&DataKey::MetadataFee)
-        .unwrap()
+    env.storage().instance().get(&DataKey::MetadataFee).unwrap()
 }
 
 pub fn set_metadata_fee(env: &Env, fee: i128) {
@@ -52,21 +49,8 @@ pub fn get_token_count(env: &Env) -> u32 {
         .unwrap_or(0)
 }
 
-pub fn increment_token_count(env: &Env) -> u32 {
-    let count = get_token_count(env);
-    let new_count = count + 1;
-    env.storage()
-        .instance()
-        .set(&DataKey::TokenCount, &new_count);
-    new_count
-}
-
 pub fn get_token_info(env: &Env, index: u32) -> Option<TokenInfo> {
     env.storage().instance().get(&DataKey::Token(index))
-}
-
-pub fn set_token_info(env: &Env, index: u32, info: &TokenInfo) {
-    env.storage().instance().set(&DataKey::Token(index), info);
 }
 
 // Get factory state
