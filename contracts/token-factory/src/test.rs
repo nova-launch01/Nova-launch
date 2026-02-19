@@ -67,7 +67,7 @@ fn test_update_fees() {
 fn test_create_token() {
     let env = Env::default();
     env.mock_all_auths();
-    
+
     let contract_id = env.register_contract(None, TokenFactory);
     let client = TokenFactoryClient::new(&env, &contract_id);
 
@@ -137,7 +137,7 @@ fn test_create_token() {
 fn test_create_token_without_metadata() {
     let env = Env::default();
     env.mock_all_auths();
-    
+
     let contract_id = env.register_contract(None, TokenFactory);
     let client = TokenFactoryClient::new(&env, &contract_id);
 
@@ -174,7 +174,7 @@ fn test_create_token_without_metadata() {
 
     // Verify token deployed
     // assert!(token_address != Address::generate(&env));
-    
+
     // Verify token info has no metadata
     // let token_info = client.get_token_info(&0).unwrap();
     // assert_eq!(token_info.metadata_uri, None);
@@ -186,7 +186,7 @@ fn test_create_token_without_metadata() {
 fn test_create_token_insufficient_fee() {
     let env = Env::default();
     env.mock_all_auths();
-    
+
     let contract_id = env.register_contract(None, TokenFactory);
     let client = TokenFactoryClient::new(&env, &contract_id);
 
@@ -224,7 +224,7 @@ fn test_create_token_insufficient_fee() {
 fn test_create_token_invalid_parameters() {
     let env = Env::default();
     env.mock_all_auths();
-    
+
     let contract_id = env.register_contract(None, TokenFactory);
     let client = TokenFactoryClient::new(&env, &contract_id);
 
@@ -234,7 +234,7 @@ fn test_create_token_invalid_parameters() {
 
     client.initialize(&admin, &treasury, &70_000_000, &30_000_000);
 
-    let name = String::from_str(&env, "");  // Empty name - invalid
+    let name = String::from_str(&env, ""); // Empty name - invalid
     let symbol = String::from_str(&env, "TEST");
     let decimals = 7u32;
     let initial_supply = 1_000_000_0000000i128;

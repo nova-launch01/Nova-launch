@@ -15,12 +15,7 @@ fn token_name_strategy() -> impl Strategy<Value = &'static str> {
 
 // Strategy for generating valid token symbols (1-12 chars)
 fn token_symbol_strategy() -> impl Strategy<Value = &'static str> {
-    prop_oneof![
-        Just("TEST"),
-        Just("TKN"),
-        Just("A"),
-        Just("ABCDEFGHIJKL"),
-    ]
+    prop_oneof![Just("TEST"), Just("TKN"), Just("A"), Just("ABCDEFGHIJKL"),]
 }
 
 // Strategy for generating edge case strings
@@ -34,12 +29,7 @@ fn edge_case_string_strategy() -> impl Strategy<Value = &'static str> {
 
 // Strategy for decimals (0-18 is typical, test beyond)
 fn decimals_strategy() -> impl Strategy<Value = u32> {
-    prop_oneof![
-        Just(0u32),
-        Just(7u32),
-        Just(18u32),
-        Just(255u32),
-    ]
+    prop_oneof![Just(0u32), Just(7u32), Just(18u32), Just(255u32),]
 }
 
 // Strategy for supply amounts
@@ -99,7 +89,7 @@ proptest! {
     ) {
         let env = Env::default();
         env.mock_all_auths();
-        
+
         let contract_id = env.register_contract(None, TokenFactory);
         let client = TokenFactoryClient::new(&env, &contract_id);
 
@@ -135,11 +125,11 @@ proptest! {
         client.initialize(&admin, &treasury, &base_fee, &metadata_fee);
 
         let state = client.get_state();
-        
+
         // Verify fees are stored correctly
         prop_assert_eq!(state.base_fee, base_fee);
         prop_assert_eq!(state.metadata_fee, metadata_fee);
-        
+
         // Verify total fee calculation doesn't overflow
         let total_fee = base_fee.checked_add(metadata_fee);
         prop_assert!(total_fee.is_some());
@@ -202,7 +192,7 @@ proptest! {
     ) {
         let env = Env::default();
         env.mock_all_auths();
-        
+
         let contract_id = env.register_contract(None, TokenFactory);
         let client = TokenFactoryClient::new(&env, &contract_id);
 
@@ -344,7 +334,7 @@ mod edge_cases {
     fn test_update_fees_with_none() {
         let env = Env::default();
         env.mock_all_auths();
-        
+
         let contract_id = env.register_contract(None, TokenFactory);
         let client = TokenFactoryClient::new(&env, &contract_id);
 
