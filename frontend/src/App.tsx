@@ -1,5 +1,6 @@
-import { Header, Container } from './components/Layout';
-import { Card, ErrorBoundary } from './components/UI';
+import { Header, Container } from "./components/Layout";
+import { Card, ErrorBoundary } from "./components/UI";
+import { ConnectButton } from "./components/WalletConnect";
 
 function App() {
   return (
@@ -9,13 +10,14 @@ function App() {
       </a>
       <div className="min-h-screen bg-gray-50">
         <Header>
-          {/* Wallet connect button will go here */}
+          <ConnectButton />
         </Header>
         <main id="main-content">
           <Container>
             <Card title="Deploy Your Token">
               <p className="text-gray-600">
-                Welcome to Stellar Token Deployer. Connect your wallet to get started.
+                Welcome to Stellar Token Deployer. Connect your wallet to get
+                started.
               </p>
             </Card>
           </Container>
