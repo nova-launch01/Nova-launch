@@ -7,6 +7,16 @@ import {
     invalidStellarAddressWithReason,
 } from '../../test/generators';
 
+const withGuaranteedLowercaseChar = (address: string): string => {
+    const firstUppercaseIndex = address.slice(1).search(/[A-Z]/);
+    if (firstUppercaseIndex >= 0) {
+        const position = firstUppercaseIndex + 1;
+        return `${address.slice(0, position)}${address[position].toLowerCase()}${address.slice(position + 1)}`;
+    }
+
+    return `g${address.slice(1)}`;
+};
+
 /**
  * Property-based tests for Stellar address validation
  * Runs 1000+ iterations to verify validation logic
@@ -190,11 +200,7 @@ describe('Stellar Address Validation - Property Tests', () => {
         it('should handle mixed case (should fail)', () => {
             fc.assert(
                 fc.property(
-                    validStellarAddress().chain((addr) =>
-                        fc.integer({ min: 1, max: addr.length - 1 }).map((pos) =>
-                            addr.substring(0, pos) + addr.substring(pos).toLowerCase()
-                        )
-                    ),
+                    validStellarAddress().map(withGuaranteedLowercaseChar),
                     (address) => {
                         expect(isValidStellarAddress(address)).toBe(false);
                     }

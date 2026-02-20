@@ -7,6 +7,7 @@
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178C6?style=for-the-badge&logo=typescript)
 ![Rust](https://img.shields.io/badge/Rust-2021-000000?style=for-the-badge&logo=rust)
 ![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)
+![Coverage](https://img.shields.io/badge/Coverage->80%25-brightgreen?style=for-the-badge)
 
 **A user-friendly dApp for quick token deployment on Stellar, targeting creators in Nigeria and emerging markets.**
 

@@ -6,9 +6,9 @@ import {
     nativeToScVal,
     rpc,
 } from '@stellar/stellar-sdk';
-import type { TokenDeployParams, DeploymentResult } from '../types';
+import type { TokenDeployParams, DeploymentResult, FeeBreakdown } from '../types';
 import { STELLAR_CONFIG, getNetworkConfig } from '../config/stellar';
-import { parseStellarError, logStellarError } from './stellarErrors';
+
 
 export class StellarService {
     private server: rpc.Server;
@@ -21,34 +21,7 @@ export class StellarService {
     }
 
     async deployToken(params: TokenDeployParams): Promise<DeploymentResult> {
-        try {
-            const { name, symbol, decimals, initialSupply, adminWallet, metadata } = params;
 
-            // Get source account
-            const sourceAccount = await this.getAccount(adminWallet);
-
-            // Build contract invocation
-            const contract = new Contract(STELLAR_CONFIG.factoryContractId);
-            
-            const metadataUri = metadata ? `ipfs://${metadata.description}` : null;
-            const totalFee = metadataUri ? '100000000' : '70000000';
-
-            // Build transaction
-            const transaction = new TransactionBuilder(sourceAccount, {
-                fee: BASE_FEE,
-                networkPassphrase: this.networkPassphrase,
-            })
-                .addOperation(
-                    contract.call(
-                        'create_token',
-                        nativeToScVal(adminWallet, { type: 'address' }),
-                        nativeToScVal(name, { type: 'string' }),
-                        nativeToScVal(symbol, { type: 'string' }),
-                        nativeToScVal(decimals, { type: 'u32' }),
-                        nativeToScVal(BigInt(initialSupply), { type: 'i128' }),
-                        metadataUri ? nativeToScVal(metadataUri, { type: 'string' }) : nativeToScVal(null),
-                        nativeToScVal(BigInt(totalFee), { type: 'i128' })
-                    )
                 )
                 .setTimeout(180)
                 .build();
@@ -103,30 +76,19 @@ export class StellarService {
             throw new Error(`Simulation failed: ${simulatedTx.error}`);
         }
 
-        return simulatedTx;
+
     }
 
     private async requestSignature(xdr: string): Promise<string> {
-        if (!window.freighter) {
-            throw new Error('Freighter wallet not found');
+        const signedTxXdr = await WalletService.signTransaction(xdr, this.networkPassphrase);
+        if (!signedTxXdr) {
+            throw new Error('Transaction signing failed or was rejected');
         }
-
-        const { signTransaction } = await import('@stellar/freighter-api');
-        const { signedTxXdr } = await signTransaction(xdr, {
-            networkPassphrase: this.networkPassphrase,
-        });
 
         return signedTxXdr;
     }
 
-    private async submitTransaction(transaction: ReturnType<typeof TransactionBuilder.fromXDR>) {
-        const response = await this.server.sendTransaction(transaction);
 
-        if (response.status === 'ERROR') {
-            throw new Error(`Transaction failed: ${response.errorResult?.toXDR('base64')}`);
-        }
-
-        return response;
     }
 
     private async waitForConfirmation(hash: string): Promise<rpc.Api.GetTransactionResponse> {
@@ -165,14 +127,17 @@ export class StellarService {
         }
 
         const address = scValToNative(result.returnValue);
-        return address;
-    }
-}
+        if (typeof address === 'string' && address.length > 0) {
+            return address;
+        }
 
-declare global {
-    interface Window {
-        freighter?: {
-            requestPublicKey: () => Promise<{ publicKey: string }>;
-        };
+        if (address && typeof address === 'object' && 'toString' in address) {
+            const normalized = String(address);
+            if (normalized && normalized !== '[object Object]') {
+                return normalized;
+            }
+        }
+
+        throw new Error('Failed to parse token address');
     }
 }

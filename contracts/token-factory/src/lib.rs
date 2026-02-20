@@ -90,3 +90,6 @@ mod test;
 
 #[cfg(test)]
 mod fuzz_test;
+
+#[cfg(test)]
+mod bench_test;

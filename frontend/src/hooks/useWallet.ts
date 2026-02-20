@@ -12,9 +12,8 @@ export const useWallet = () => {
     });
     const [isConnecting, setIsConnecting] = useState(false);
     const [error, setError] = useState<string | null>(null);
-
-    // Use a ref to store the current listener cleanup function
     const cleanupRef = useRef<(() => void) | null>(null);
+    const isInitializedRef = useRef(false);
 
     const disconnect = useCallback(() => {
         setWallet({
@@ -22,9 +21,9 @@ export const useWallet = () => {
             address: null,
             network: 'testnet',
         });
+        setError(null);
         localStorage.removeItem(WALLET_CONNECTED_KEY);
 
-        // Remove listener when disconnected
         if (cleanupRef.current) {
             cleanupRef.current();
             cleanupRef.current = null;
@@ -34,33 +33,30 @@ export const useWallet = () => {
     const updateWalletState = useCallback(async () => {
         try {
             const isInstalled = await WalletService.isInstalled();
-            if (!isInstalled) {
-                return false;
-            }
+            if (!isInstalled) return false;
 
             const address = await WalletService.getPublicKey();
-            const network = await WalletService.getNetwork();
-
-            if (address) {
-                setWallet({
-                    connected: true,
-                    address,
-                    network,
-                });
-                localStorage.setItem(WALLET_CONNECTED_KEY, 'true');
-                return true;
-            } else {
+            if (!address) {
                 disconnect();
                 return false;
             }
+
+            const network = await WalletService.getNetwork();
+            setWallet({
+                connected: true,
+                address,
+                network,
+            });
+            localStorage.setItem(WALLET_CONNECTED_KEY, 'true');
+            return true;
         } catch (err) {
             console.error('Failed to update wallet state:', err);
+            disconnect();
             return false;
         }
     }, [disconnect]);
 
     const setupListeners = useCallback(() => {
-        // Clean up existing listener if any
         if (cleanupRef.current) cleanupRef.current();
 
         cleanupRef.current = WalletService.watchChanges(({ address, network }) => {
@@ -71,6 +67,7 @@ export const useWallet = () => {
                     address,
                     network: net as 'testnet' | 'mainnet',
                 });
+                localStorage.setItem(WALLET_CONNECTED_KEY, 'true');
             } else {
                 disconnect();
             }
@@ -88,11 +85,11 @@ export const useWallet = () => {
             }
 
             const success = await updateWalletState();
-            if (success) {
-                setupListeners();
-            } else {
+            if (!success) {
                 throw new Error('User rejected connection or account not found');
             }
+
+            setupListeners();
         } catch (err: any) {
             setError(err.message || 'Failed to connect wallet');
             disconnect();
@@ -101,27 +98,29 @@ export const useWallet = () => {
         }
     }, [updateWalletState, setupListeners, disconnect]);
 
-    // Initial silent reconnect
     useEffect(() => {
+        if (isInitializedRef.current) return;
+        isInitializedRef.current = true;
+
         const wasConnected = localStorage.getItem(WALLET_CONNECTED_KEY) === 'true';
+        if (!wasConnected) return;
 
-        const init = async () => {
-            if (wasConnected) {
-                const isInstalled = await WalletService.isInstalled();
-                if (isInstalled) {
-                    const success = await updateWalletState();
-                    if (success) {
-                        setupListeners();
-                    }
-                }
+        (async () => {
+            const isInstalled = await WalletService.isInstalled();
+            if (!isInstalled) {
+                localStorage.removeItem(WALLET_CONNECTED_KEY);
+                return;
             }
-        };
 
-        init();
+            const success = await updateWalletState();
+            if (success) setupListeners();
+        })();
 
-        // Cleanup on unmount
         return () => {
-            if (cleanupRef.current) cleanupRef.current();
+            if (cleanupRef.current) {
+                cleanupRef.current();
+                cleanupRef.current = null;
+            }
         };
     }, [updateWalletState, setupListeners]);
 

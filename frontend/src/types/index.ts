@@ -8,6 +8,7 @@ export interface TokenDeployParams {
         image: File;
         description: string;
     };
+    metadataUri?: string;
 }
 
 export interface DeploymentResult {

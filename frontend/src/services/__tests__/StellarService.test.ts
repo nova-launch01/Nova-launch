@@ -1,6 +1,38 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { StellarService } from '../StellarService';
 import type { TokenDeployParams } from '../../types';
+import { WalletService } from '../wallet';
+
+vi.mock('../../config/stellar', () => ({
+    STELLAR_CONFIG: {
+        network: 'testnet',
+        factoryContractId: 'test-factory-contract-id',
+        testnet: {
+            networkPassphrase: 'Test SDF Network ; September 2015',
+            horizonUrl: 'https://horizon-testnet.stellar.org',
+            sorobanRpcUrl: 'https://soroban-testnet.stellar.org',
+        },
+        mainnet: {
+            networkPassphrase: 'Public Global Stellar Network ; September 2015',
+            horizonUrl: 'https://horizon.stellar.org',
+            sorobanRpcUrl: 'https://soroban-mainnet.stellar.org',
+        },
+    },
+    getNetworkConfig: (network: 'testnet' | 'mainnet') => ({
+        networkPassphrase:
+            network === 'mainnet'
+                ? 'Public Global Stellar Network ; September 2015'
+                : 'Test SDF Network ; September 2015',
+        horizonUrl:
+            network === 'mainnet'
+                ? 'https://horizon.stellar.org'
+                : 'https://horizon-testnet.stellar.org',
+        sorobanRpcUrl:
+            network === 'mainnet'
+                ? 'https://soroban-mainnet.stellar.org'
+                : 'https://soroban-testnet.stellar.org',
+    }),
+}));
 
 // Mock the Stellar SDK
 vi.mock('@stellar/stellar-sdk', () => {
@@ -50,11 +82,10 @@ vi.mock('@stellar/stellar-sdk', () => {
     };
 });
 
-// Mock Freighter API
-vi.mock('@stellar/freighter-api', () => ({
-    signTransaction: vi.fn().mockResolvedValue({
-        signedTxXdr: 'signed-xdr',
-    }),
+vi.mock('../wallet', () => ({
+    WalletService: {
+        signTransaction: vi.fn().mockResolvedValue('signed-xdr'),
+    },
 }));
 
 describe('StellarService', () => {
@@ -71,12 +102,7 @@ describe('StellarService', () => {
             adminWallet: 'GTEST123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ123456789ABCDEFG',
         };
 
-        // Mock window.freighter
-        (global as unknown as { window: { freighter?: { requestPublicKey: () => void } } }).window = {
-            freighter: {
-                requestPublicKey: vi.fn(),
-            },
-        };
+        vi.mocked(WalletService.signTransaction).mockResolvedValue('signed-xdr');
     });
 
     describe('deployToken', () => {
@@ -106,11 +132,11 @@ describe('StellarService', () => {
             expect(result.totalFee).toBe('100000000');
         });
 
-        it('should throw error when Freighter is not available', async () => {
-            (global as unknown as { window: { freighter?: unknown } }).window.freighter = undefined;
+        it('should throw error when signing fails', async () => {
+            vi.mocked(WalletService.signTransaction).mockResolvedValue(null);
 
             await expect(service.deployToken(mockParams)).rejects.toThrow(
-                'Wallet not connected'
+
             );
         });
     });
