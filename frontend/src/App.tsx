@@ -1,3 +1,4 @@
+import { useEffect, useState, lazy } from "react";
 import { Header, Container } from "./components/Layout";
 import { Button, Card, ErrorBoundary } from "./components/UI";
 import {
@@ -6,6 +7,12 @@ import {
   PWAConnectionStatus,
 } from "./components/PWA";
 import { TokenDeployForm } from "./components/TokenDeployForm";
+import {
+  TutorialOverlay,
+  CompletionCelebration,
+  useTutorial,
+  deploymentTutorialSteps,
+} from "./components/Tutorial";
 import { useWallet } from "./hooks/useWallet";
 import { truncateAddress } from "./utils/formatting";
 
@@ -26,6 +33,27 @@ function usePathname() {
 
 function App() {
   const { wallet, connect, disconnect, isConnecting, error } = useWallet();
+  const [showCelebration, setShowCelebration] = useState(false);
+  const tutorial = useTutorial(deploymentTutorialSteps);
+
+  const handleTutorialComplete = () => {
+    tutorial.complete();
+    setShowCelebration(true);
+  };
+
+  const handleCelebrationClose = () => {
+    setShowCelebration(false);
+  };
+
+  useEffect(() => {
+    // Auto-start tutorial for first-time users
+    if (!tutorial.hasCompletedBefore) {
+      const timer = setTimeout(() => {
+        tutorial.start();
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [tutorial.hasCompletedBefore]);
 
   return (
     <ErrorBoundary>
@@ -37,17 +65,37 @@ function App() {
           <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-4">
             <PWAConnectionStatus />
             <PWAInstallButton />
+            {!tutorial.hasCompletedBefore && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={tutorial.start}
+                data-tutorial="restart-tutorial"
+              >
+                Start Tutorial
+              </Button>
+            )}
             {wallet.connected && wallet.address ? (
               <div className="flex items-center gap-2">
                 <Button variant="secondary" size="sm" disabled>
                   {truncateAddress(wallet.address)}
                 </Button>
-                <Button variant="outline" size="sm" onClick={disconnect}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={disconnect}
+                  data-tutorial="connect-wallet"
+                >
                   Disconnect
                 </Button>
               </div>
             ) : (
-              <Button size="sm" onClick={() => void connect()} loading={isConnecting}>
+              <Button
+                size="sm"
+                onClick={() => void connect()}
+                loading={isConnecting}
+                data-tutorial="connect-wallet"
+              >
                 Connect Wallet
               </Button>
             )}
@@ -70,6 +118,18 @@ function App() {
           </Container>
         </main>
         <PWAUpdateNotification />
+
+        {/* Tutorial System */}
+        <TutorialOverlay
+          steps={deploymentTutorialSteps}
+          currentStep={tutorial.currentStep}
+          onNext={tutorial.next}
+          onPrevious={tutorial.previous}
+          onSkip={tutorial.skip}
+          onComplete={handleTutorialComplete}
+          isActive={tutorial.isActive}
+        />
+        <CompletionCelebration isOpen={showCelebration} onClose={handleCelebrationClose} />
       </div>
     </ErrorBoundary>
   );

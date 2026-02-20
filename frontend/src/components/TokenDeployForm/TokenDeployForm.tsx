@@ -132,20 +132,22 @@ export function TokenDeployForm({
 
     if (step === 'basic') {
         return (
-            <BasicInfoStep
-                onNext={handleBasicNext}
-                initialData={
-                    wallet.address
-                        ? {
-                            name: basicInfo?.name || '',
-                            symbol: basicInfo?.symbol || '',
-                            decimals: basicInfo?.decimals ?? 7,
-                            initialSupply: basicInfo?.initialSupply || '',
-                            adminWallet: basicInfo?.adminWallet || wallet.address,
-                        }
-                        : basicInfo || undefined
-                }
-            />
+            <div data-tutorial="token-form">
+                <BasicInfoStep
+                    onNext={handleBasicNext}
+                    initialData={
+                        wallet.address
+                            ? {
+                                name: basicInfo?.name || '',
+                                symbol: basicInfo?.symbol || '',
+                                decimals: basicInfo?.decimals ?? 7,
+                                initialSupply: basicInfo?.initialSupply || '',
+                                adminWallet: basicInfo?.adminWallet || wallet.address,
+                            }
+                            : basicInfo || undefined
+                    }
+                />
+            </div>
         );
     }
 
@@ -242,6 +244,7 @@ export function TokenDeployForm({
                     loading={isDeploying}
                     className="w-full"
                     disabled={!wallet.connected}
+                    data-tutorial="deploy-button"
                 >
                     Deploy Token
                 </Button>
