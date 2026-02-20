@@ -13,6 +13,11 @@ export const ERROR_MESSAGES: Record<ErrorCode, string> = {
     [ErrorCode.TRANSACTION_FAILED]: 'Transaction failed. Please try again',
     [ErrorCode.WALLET_REJECTED]: 'Transaction was cancelled',
     [ErrorCode.NETWORK_ERROR]: 'Network error. Please check your connection',
+    [ErrorCode.SIMULATION_FAILED]: 'Transaction simulation failed',
+    [ErrorCode.CONTRACT_ERROR]: 'Smart contract error occurred',
+    [ErrorCode.TIMEOUT_ERROR]: 'Transaction confirmation timeout',
+    [ErrorCode.ACCOUNT_NOT_FOUND]: 'Account not found on network',
+    [ErrorCode.INVALID_SIGNATURE]: 'Invalid transaction signature',
 };
 
 export function createError(code: ErrorCode, details?: string): AppError {

@@ -110,7 +110,7 @@ describe('StellarService', () => {
             (global as unknown as { window: { freighter?: unknown } }).window.freighter = undefined;
 
             await expect(service.deployToken(mockParams)).rejects.toThrow(
-                'Freighter wallet not found'
+                'Wallet not connected'
             );
         });
     });
