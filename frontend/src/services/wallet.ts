@@ -7,11 +7,12 @@ import {
     requestAccess,
 } from '@stellar/freighter-api';
 import { getNetworkConfig } from '../config/stellar';
+import { withRetry, DEFAULT_RETRY_CONFIG } from '../utils/retry';
 
 export class WalletService {
     static async isInstalled(): Promise<boolean> {
         try {
-            const result = await isConnected();
+            const result = await withRetry(() => isConnected(), DEFAULT_RETRY_CONFIG);
             return !!result.isConnected;
         } catch {
             return false;
@@ -49,7 +50,7 @@ export class WalletService {
 
     static async getPublicKey(): Promise<string | null> {
         try {
-            const result = await getAddress();
+            const result = await withRetry(() => getAddress(), DEFAULT_RETRY_CONFIG);
             return result.address || null;
         } catch {
             return null;
@@ -58,7 +59,7 @@ export class WalletService {
 
     static async getNetwork(): Promise<'testnet' | 'mainnet'> {
         try {
-            const result = await getNetwork();
+            const result = await withRetry(() => getNetwork(), DEFAULT_RETRY_CONFIG);
             const network = result.network || 'testnet';
             return network.toLowerCase().includes('public') ? 'mainnet' : 'testnet';
         } catch {
