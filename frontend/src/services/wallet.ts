@@ -10,8 +10,8 @@ export class WalletService {
     // Check if Freighter is installed and ready
     static async isInstalled(): Promise<boolean> {
         try {
-            const result = await isConnected();
-            return !!result.isConnected;
+            await isConnected();
+            return true;
         } catch (error) {
             console.error('Error checking Freighter connection:', error);
             return false;

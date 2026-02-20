@@ -6,8 +6,23 @@ import {
     nativeToScVal,
     rpc,
 } from '@stellar/stellar-sdk';
-import type { TokenDeployParams, DeploymentResult } from '../types';
+import type { TokenDeployParams, DeploymentResult, FeeBreakdown } from '../types';
 import { STELLAR_CONFIG, getNetworkConfig } from '../config/stellar';
+import { WalletService } from './wallet';
+
+const BASE_DEPLOY_FEE_STROOPS = 70_000_000n;
+const METADATA_FEE_STROOPS = 30_000_000n;
+
+export function getDeploymentFeeBreakdown(hasMetadata: boolean): FeeBreakdown {
+    const baseFee = 7;
+    const metadataFee = hasMetadata ? 3 : 0;
+
+    return {
+        baseFee,
+        metadataFee,
+        totalFee: baseFee + metadataFee,
+    };
+}
 
 export class StellarService {
     private server: rpc.Server;
@@ -20,16 +35,18 @@ export class StellarService {
     }
 
     async deployToken(params: TokenDeployParams): Promise<DeploymentResult> {
-        const { name, symbol, decimals, initialSupply, adminWallet, metadata } = params;
+        const { name, symbol, decimals, initialSupply, adminWallet } = params;
+
+        if (!STELLAR_CONFIG.factoryContractId) {
+            throw new Error('Factory contract ID is not configured');
+        }
 
         // Get source account
         const sourceAccount = await this.server.getAccount(adminWallet);
 
         // Build contract invocation
         const contract = new Contract(STELLAR_CONFIG.factoryContractId);
-        
-        const metadataUri = metadata ? `ipfs://${metadata.description}` : null;
-        const totalFee = metadataUri ? '100000000' : '70000000'; // base_fee + metadata_fee or just base_fee
+        const totalFeeStroops = this.calculateTotalFee(params);
 
         // Build transaction
         const transaction = new TransactionBuilder(sourceAccount, {
@@ -44,8 +61,7 @@ export class StellarService {
                     nativeToScVal(symbol, { type: 'string' }),
                     nativeToScVal(decimals, { type: 'u32' }),
                     nativeToScVal(BigInt(initialSupply), { type: 'i128' }),
-                    metadataUri ? nativeToScVal(metadataUri, { type: 'string' }) : nativeToScVal(null),
-                    nativeToScVal(BigInt(totalFee), { type: 'i128' })
+                    nativeToScVal(totalFeeStroops, { type: 'i128' })
                 )
             )
             .setTimeout(180)
@@ -81,22 +97,23 @@ export class StellarService {
         return {
             tokenAddress,
             transactionHash: response.hash,
-            totalFee,
+            totalFee: totalFeeStroops.toString(),
             timestamp: Date.now(),
         };
     }
 
     private async requestSignature(xdr: string): Promise<string> {
-        if (!window.freighter) {
-            throw new Error('Freighter wallet not found');
+        const signedTxXdr = await WalletService.signTransaction(xdr, this.networkPassphrase);
+        if (!signedTxXdr) {
+            throw new Error('Transaction signing failed or was rejected');
         }
 
-        const { signTransaction } = await import('@stellar/freighter-api');
-        const { signedTxXdr } = await signTransaction(xdr, {
-            networkPassphrase: this.networkPassphrase,
-        });
-
         return signedTxXdr;
+    }
+
+    private calculateTotalFee(params: TokenDeployParams): bigint {
+        const hasMetadata = Boolean(params.metadataUri || params.metadata);
+        return hasMetadata ? BASE_DEPLOY_FEE_STROOPS + METADATA_FEE_STROOPS : BASE_DEPLOY_FEE_STROOPS;
     }
 
     private async waitForConfirmation(hash: string): Promise<rpc.Api.GetTransactionResponse> {
@@ -127,14 +144,17 @@ export class StellarService {
         }
 
         const address = scValToNative(result.returnValue);
-        return address;
-    }
-}
+        if (typeof address === 'string' && address.length > 0) {
+            return address;
+        }
 
-declare global {
-    interface Window {
-        freighter?: {
-            requestPublicKey: () => Promise<{ publicKey: string }>;
-        };
+        if (address && typeof address === 'object' && 'toString' in address) {
+            const normalized = String(address);
+            if (normalized && normalized !== '[object Object]') {
+                return normalized;
+            }
+        }
+
+        throw new Error('Failed to parse token address');
     }
 }

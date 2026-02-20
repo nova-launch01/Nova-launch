@@ -7,6 +7,16 @@ import {
     invalidStellarAddressWithReason,
 } from '../../test/generators';
 
+const withGuaranteedLowercaseChar = (address: string): string => {
+    const firstUppercaseIndex = address.slice(1).search(/[A-Z]/);
+    if (firstUppercaseIndex >= 0) {
+        const position = firstUppercaseIndex + 1;
+        return `${address.slice(0, position)}${address[position].toLowerCase()}${address.slice(position + 1)}`;
+    }
+
+    return `g${address.slice(1)}`;
+};
+
 /**
  * Comprehensive property-based tests for Stellar address validation
  * This file provides additional edge cases and comprehensive coverage
@@ -111,11 +121,7 @@ describe('Stellar Address Validation - Comprehensive Property Tests', () => {
         it('should reject addresses with lowercase characters', () => {
             fc.assert(
                 fc.property(
-                    validStellarAddress().chain((addr) =>
-                        fc.integer({ min: 1, max: addr.length - 1 }).map((pos) =>
-                            addr.substring(0, pos) + addr[pos].toLowerCase() + addr.substring(pos + 1)
-                        )
-                    ),
+                    validStellarAddress().map(withGuaranteedLowercaseChar),
                     (address) => {
                         expect(isValidStellarAddress(address)).toBe(false);
                     }
@@ -256,11 +262,7 @@ describe('Stellar Address Validation - Comprehensive Property Tests', () => {
         it('should reject addresses with mixed case', () => {
             fc.assert(
                 fc.property(
-                    validStellarAddress().chain((addr) =>
-                        fc.integer({ min: 1, max: addr.length - 1 }).map((pos) =>
-                            addr.substring(0, pos) + addr.substring(pos).toLowerCase()
-                        )
-                    ),
+                    validStellarAddress().map(withGuaranteedLowercaseChar),
                     (address) => {
                         expect(isValidStellarAddress(address)).toBe(false);
                     }
