@@ -79,7 +79,7 @@ export class StellarService {
         }
 
         throw new Error(`HTTP ${response.status}`);
-      } catch (error) {
+      } catch {
         if (Date.now() - startTime >= MAX_POLL_TIME_MS) {
           throw new Error('Transaction monitoring timeout');
         }
