@@ -3,12 +3,13 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -p 3001",
     "build": "prisma generate && next build",
-    "start": "next start",
+    "start": "next start -p 3001",
     "lint": "next lint",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "test": "vitest",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
     "db:studio": "prisma studio"
@@ -16,8 +17,10 @@
   "dependencies": {
     "@prisma/client": "^6.19.2",
     "@stellar/stellar-sdk": "^14.5.0",
+    "@pinata/sdk": "^2.1.0",
     "axios": "^1.13.5",
     "next": "16.1.6",
+    "node-cache": "^5.1.2",
     "prisma": "^6.19.2",
     "react": "19.2.3",
     "react-dom": "19.2.3",
@@ -32,6 +35,7 @@
     "eslint-config-next": "16.1.6",
     "eslint-config-prettier": "^10.1.8",
     "prettier": "^3.8.1",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^1.5.0"
   }
 }
