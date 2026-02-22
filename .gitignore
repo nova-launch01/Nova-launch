@@ -29,8 +29,15 @@ npm-debug.log*
 *.md
 !README.md
 
-# Documentation (excluding README.md, design.md, and TESTING.md)
+# Documentation (excluding specific files)
 *.md
 !README.md
 !.nova/specs/stellar-token-deployer/design.md
 !contracts/token-factory/TESTING.md
+!DEPLOYMENT_GUIDE.md
+!DEPLOYMENT_CHECKLIST.md
+!CONFLICT_AND_CI_REPORT.md
+
+# Deployment artifacts (generated during deployment)
+deployment-testnet.json
+deployment-mainnet.json

@@ -284,23 +284,25 @@ soroban contract optimize \
 #### Deploy Contract to Testnet
 
 ```bash
-# Deploy
-soroban contract deploy \
-  --wasm target/wasm32-unknown-unknown/release/token_factory.wasm \
-  --network testnet \
-  --source admin
+# Quick deployment (recommended)
+./scripts/deploy-testnet.sh
 
-# Initialize factory
-soroban contract invoke \
-  --id <CONTRACT_ID> \
-  --network testnet \
-  --source admin \
-  -- initialize \
-  --admin <ADMIN_ADDRESS> \
-  --treasury <TREASURY_ADDRESS> \
-  --base_fee 70000000 \
-  --metadata_fee 30000000
+# This script will:
+# - Verify admin identity
+# - Create treasury identity if needed
+# - Deploy the contract
+# - Initialize with proper configuration
+# - Save deployment info to deployment-testnet.json
+# - Run basic smoke tests
+
+# Verify deployment
+./scripts/verify-deployment.sh
+
+# Update frontend environment
+./scripts/update-frontend-env.sh
 ```
+
+For detailed deployment instructions, see [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md).
 
 ---
 

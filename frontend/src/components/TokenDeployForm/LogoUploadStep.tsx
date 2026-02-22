@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { ImageUpload } from '../UI/ImageUpload';
 import { Button } from '../UI/Button';
-import { uploadToIPFS } from '../../services/IPFSService';
+import { uploadToIPFSWithProgress } from '../../services/IPFSService';
+import type { IPFSUploadHandle } from '../../services/IPFSService';
 import type { ImageValidationResult } from '../../utils/imageValidation';
 
 interface LogoUploadStepProps {
@@ -31,6 +32,10 @@ export function LogoUploadStep({
   const [validationResult, setValidationResult] = useState<ImageValidationResult | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploadPercent, setUploadPercent] = useState<number | null>(null);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [eta, setEta] = useState<string | null>(null);
+  const uploadHandleRef = useRef<IPFSUploadHandle | null>(null);
 
   const handleImageSelect = (file: File, result: ImageValidationResult) => {
     setLogoData({ file });
@@ -55,15 +60,36 @@ export function LogoUploadStep({
 
     setIsUploading(true);
     setUploadError(null);
+    setUploadPercent(0);
+    setStatusMessage('Preparing upload...');
+    setEta(null);
 
     try {
-      const result = await uploadToIPFS(logoData.file, validationResult, {
-        name: `${tokenName || 'Token'} Logo`,
-        keyvalues: {
-          tokenName: tokenName || '',
-          tokenSymbol: tokenSymbol || '',
+      const handle = uploadToIPFSWithProgress(
+        logoData.file,
+        validationResult,
+        {
+          name: `${tokenName || 'Token'} Logo`,
+          keyvalues: {
+            tokenName: tokenName || '',
+            tokenSymbol: tokenSymbol || '',
+          },
         },
-      });
+        (p) => {
+          setUploadPercent(p.percent);
+          setStatusMessage(`Uploading... ${p.percent}%`);
+          if (p.estimatedRemainingMs !== undefined) {
+            const seconds = Math.max(0, Math.round(p.estimatedRemainingMs / 1000));
+            const mins = Math.floor(seconds / 60);
+            const secs = seconds % 60;
+            setEta(mins > 0 ? `${mins}m ${secs}s` : `${secs}s`);
+          }
+        }
+      );
+
+      uploadHandleRef.current = handle;
+
+      const result = await handle.promise;
 
       if (result.success) {
         onNext({
@@ -80,6 +106,21 @@ export function LogoUploadStep({
       );
     } finally {
       setIsUploading(false);
+      setUploadPercent(null);
+      setStatusMessage(null);
+      setEta(null);
+      uploadHandleRef.current = null;
+    }
+  };
+
+  const handleCancel = () => {
+    if (uploadHandleRef.current) {
+      uploadHandleRef.current.abort();
+      setStatusMessage('Upload canceled');
+      setIsUploading(false);
+      setUploadPercent(null);
+      setEta(null);
+      uploadHandleRef.current = null;
     }
   };
 
@@ -122,7 +163,7 @@ export function LogoUploadStep({
         </div>
       )}
 
-      <div className="flex gap-4">
+      <div className="flex flex-col gap-4">
         <Button
           type="button"
           variant="secondary"
@@ -152,6 +193,26 @@ export function LogoUploadStep({
         >
           {isUploading ? 'Uploading...' : 'Upload & Continue'}
         </Button>
+        {isUploading && (
+          <div className="mt-3 flex items-center gap-3">
+            <div className="flex-1">
+              <div className="w-full bg-gray-200 rounded h-2 overflow-hidden">
+                <div
+                  className="bg-blue-500 h-2"
+                  style={{ width: `${uploadPercent ?? 0}%`, transition: 'width 200ms linear' }}
+                />
+              </div>
+              <div className="flex justify-between text-sm text-gray-600 mt-1">
+                <div>{statusMessage}</div>
+                <div>{eta ? `ETA: ${eta}` : null}</div>
+              </div>
+            </div>
+
+            <Button type="button" variant="secondary" onClick={handleCancel} className="whitespace-nowrap">
+              Cancel
+            </Button>
+          </div>
+        )}
       </div>
 
       {tokenName && tokenSymbol && (

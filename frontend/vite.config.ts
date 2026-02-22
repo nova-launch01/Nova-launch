@@ -1,50 +1,41 @@
+/// <reference types="vite/client" />
 import { defineConfig } from 'vite'
+// @ts-expect-error - plugin-react types will be available after npm install
 import react from '@vitejs/plugin-react'
-import compression from 'vite-plugin-compression'
-import { visualizer } from 'rollup-plugin-visualizer'
 
 // https://vite.dev/config/
-export default defineConfig(() => {
-  const isAnalyze = process.env.ANALYZE === 'true'
-  const plugins = [
-    react(),
-    compression({ algorithm: 'gzip' }),
-    compression({ algorithm: 'brotliCompress', ext: '.br' }),
-  ]
-
-  if (isAnalyze) {
-    plugins.push(
-      visualizer({
-        filename: 'dist/stats.html',
-        gzipSize: true,
-        brotliSize: true,
-        open: true,
-      }),
-    )
-  }
-
-  return {
-    plugins,
-    build: {
-      target: 'es2020',
-      cssCodeSplit: true,
-      reportCompressedSize: true,
-      assetsInlineLimit: 4096,
-      rollupOptions: {
-        output: {
-          manualChunks(id) {
-            if (id.includes('node_modules')) {
-              if (id.includes('react')) {
-                return 'react'
-              }
-              return 'vendor'
+export default defineConfig({
+  plugins: [react()],
+  build: {
+    target: 'es2020',
+    cssCodeSplit: true,
+    reportCompressedSize: true,
+    assetsInlineLimit: 4096,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (id.includes('react')) {
+              return 'react-vendor'
             }
-          },
+            if (id.includes('@stellar')) {
+              return 'stellar-sdk'
+            }
+            if (id.includes('i18next')) {
+              return 'i18n'
+            }
+            return 'vendor'
+          }
+          if (id.includes('landing/Features') || 
+              id.includes('landing/FAQ') || 
+              id.includes('landing/Footer')) {
+            return 'landing'
+          }
         },
       },
     },
-    esbuild: {
-      drop: ['console', 'debugger'],
-    },
-  }
+  },
+  optimizeDeps: {
+    include: ['react', 'react-dom'],
+  },
 })

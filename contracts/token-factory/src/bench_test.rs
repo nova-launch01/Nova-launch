@@ -33,12 +33,7 @@ impl BenchSetup {
         let setup = BenchSetup::new();
         let contract_id = setup.env.register_contract(None, TokenFactory);
         let client = TokenFactoryClient::new(&setup.env, &contract_id);
-        client.initialize(
-            &setup.admin,
-            &setup.treasury,
-            &70_000_000,
-            &30_000_000,
-        );
+        client.initialize(&setup.admin, &setup.treasury, &70_000_000, &30_000_000);
         (setup, contract_id)
     }
 }
@@ -71,12 +66,7 @@ fn bench_initialize() {
     let client = TokenFactoryClient::new(&setup.env, &contract_id);
 
     let (cpu, mem) = measure(&setup.env, || {
-        client.initialize(
-            &setup.admin,
-            &setup.treasury,
-            &70_000_000,
-            &30_000_000,
-        );
+        client.initialize(&setup.admin, &setup.treasury, &70_000_000, &30_000_000);
     });
 
     println!("[bench_initialize] cpu_instructions={cpu}, memory_bytes={mem}");
@@ -114,19 +104,19 @@ fn bench_update_fees_both() {
     let client = TokenFactoryClient::new(&setup.env, &contract_id);
 
     let (cpu, mem) = measure(&setup.env, || {
-        client.update_fees(
-            &setup.admin,
-            &Some(100_000_000i128),
-            &Some(50_000_000i128),
-        );
+        client.update_fees(&setup.admin, &Some(100_000_000i128), &Some(50_000_000i128));
     });
 
-    println!(
-        "[bench_update_fees_both] cpu_instructions={cpu}, memory_bytes={mem}"
-    );
+    println!("[bench_update_fees_both] cpu_instructions={cpu}, memory_bytes={mem}");
 
-    assert!(cpu > 0, "CPU cost for update_fees (both) should be non-zero");
-    assert!(mem > 0, "Memory cost for update_fees (both) should be non-zero");
+    assert!(
+        cpu > 0,
+        "CPU cost for update_fees (both) should be non-zero"
+    );
+    assert!(
+        mem > 0,
+        "Memory cost for update_fees (both) should be non-zero"
+    );
 }
 
 /// Benchmark: `update_fees()` — base fee only
@@ -142,11 +132,12 @@ fn bench_update_fees_base_only() {
         client.update_fees(&setup.admin, &Some(100_000_000i128), &None);
     });
 
-    println!(
-        "[bench_update_fees_base_only] cpu_instructions={cpu}, memory_bytes={mem}"
-    );
+    println!("[bench_update_fees_base_only] cpu_instructions={cpu}, memory_bytes={mem}");
 
-    assert!(cpu > 0, "CPU cost for update_fees (base only) should be non-zero");
+    assert!(
+        cpu > 0,
+        "CPU cost for update_fees (base only) should be non-zero"
+    );
     assert!(
         mem > 0,
         "Memory cost for update_fees (base only) should be non-zero"
@@ -166,9 +157,7 @@ fn bench_update_fees_metadata_only() {
         client.update_fees(&setup.admin, &None, &Some(50_000_000i128));
     });
 
-    println!(
-        "[bench_update_fees_metadata_only] cpu_instructions={cpu}, memory_bytes={mem}"
-    );
+    println!("[bench_update_fees_metadata_only] cpu_instructions={cpu}, memory_bytes={mem}");
 
     assert!(
         cpu > 0,
@@ -192,12 +181,13 @@ fn bench_get_token_count() {
         let _ = client.get_token_count();
     });
 
-    println!(
-        "[bench_get_token_count] cpu_instructions={cpu}, memory_bytes={mem}"
-    );
+    println!("[bench_get_token_count] cpu_instructions={cpu}, memory_bytes={mem}");
 
     assert!(cpu > 0, "CPU cost for get_token_count should be non-zero");
-    assert!(mem > 0, "Memory cost for get_token_count should be non-zero");
+    assert!(
+        mem > 0,
+        "Memory cost for get_token_count should be non-zero"
+    );
 }
 
 /// Benchmark: `get_token_info()` — error path (token not found)
@@ -214,9 +204,7 @@ fn bench_get_nonexistent_token() {
         assert!(result.is_err(), "Expected TokenNotFound error");
     });
 
-    println!(
-        "[bench_get_nonexistent_token] cpu_instructions={cpu}, memory_bytes={mem}"
-    );
+    println!("[bench_get_nonexistent_token] cpu_instructions={cpu}, memory_bytes={mem}");
 
     assert!(
         cpu > 0,
@@ -306,11 +294,7 @@ fn bench_baseline_report() {
     });
 
     let (cpu_upd_both, mem_upd_both) = measure(&setup.env, || {
-        client.update_fees(
-            &setup.admin,
-            &Some(100_000_000i128),
-            &Some(50_000_000i128),
-        );
+        client.update_fees(&setup.admin, &Some(100_000_000i128), &Some(50_000_000i128));
     });
 
     let (cpu_upd_base, mem_upd_base) = measure(&setup.env, || {

@@ -12,14 +12,18 @@
     "preview": "vite preview",
     "test": "vitest",
     "test:ui": "vitest --ui",
-    "test:coverage": "vitest --coverage --run",
-    "test:coverage:watch": "vitest --coverage",
-    "coverage:report": "vitest --coverage --run && open coverage/index.html || xdg-open coverage/index.html"
+    "test:coverage": "vitest --coverage",
+    "test:integration": "vitest run src/test/integration --config vitest.config.ts",
+    "test:integration:watch": "vitest src/test/integration --config vitest.config.ts",
+    "test:integration:coverage": "vitest run src/test/integration --coverage --config vitest.config.ts",
+    "test:e2e": "vitest run src/test/e2e --config vitest.config.ts",
+    "test:e2e:watch": "vitest src/test/e2e --config vitest.config.ts"
   },
   "dependencies": {
-    "@stellar/stellar-sdk": "^13.3.0",
     "@stellar/freighter-api": "^6.0.1",
+    "@stellar/stellar-sdk": "^13.3.0",
     "i18next": "^25.8.12",
+    "lucide-react": "^0.575.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-i18next": "^16.5.4"
@@ -30,6 +34,7 @@
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
+    "@types/canvas-confetti": "^1.6.4",
     "@types/node": "^24.10.13",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
@@ -53,6 +58,7 @@
     "vitest": "^4.0.18"
   },
   "overrides": {
-    "vite": "^8.0.0-beta.13"
+    "vite": "^8.0.0-beta.13",
+    "rolldown": "1.0.0-rc.4"
   }
 }

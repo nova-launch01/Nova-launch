@@ -9,8 +9,8 @@ import {
 import type { TokenDeployParams, DeploymentResult, FeeBreakdown } from '../types';
 import { STELLAR_CONFIG, getNetworkConfig } from '../config/stellar';
 import { getDeploymentFeeBreakdown as calculateFeeBreakdown } from '../utils/feeCalculation';
+import { WalletService } from './wallet';
 
-// Re-export fee calculation for convenience
 export { calculateFeeBreakdown as getDeploymentFeeBreakdown };
 
 
@@ -25,29 +25,40 @@ export class StellarService {
     }
 
     async deployToken(params: TokenDeployParams): Promise<DeploymentResult> {
+        try {
+            const account = await this.getAccount(params.adminWallet);
+            const contract = new Contract(STELLAR_CONFIG.factoryContractId);
 
+            const transaction = new TransactionBuilder(account, {
+                fee: BASE_FEE,
+                networkPassphrase: this.networkPassphrase,
+            })
+                .addOperation(
+                    contract.call(
+                        'deploy_token',
+                        nativeToScVal(params.name, { type: 'string' }),
+                        nativeToScVal(params.symbol, { type: 'string' }),
+                        nativeToScVal(params.decimals, { type: 'u32' }),
+                        nativeToScVal(params.initialSupply, { type: 'i128' }),
+                        nativeToScVal(params.adminWallet, { type: 'address' }),
+                    )
                 )
                 .setTimeout(180)
                 .build();
 
-            // Simulate transaction
             const simulatedTx = await this.simulateTransaction(transaction);
-            
-            // Prepare transaction
             const preparedTx = rpc.assembleTransaction(transaction, simulatedTx).build();
 
-            // Request wallet signature
             const signedXdr = await this.requestSignature(preparedTx.toXDR());
             const signedTx = TransactionBuilder.fromXDR(signedXdr, this.networkPassphrase);
 
-            // Submit to network
             const response = await this.submitTransaction(signedTx);
-
-            // Wait for confirmation
             const result = await this.waitForConfirmation(response.hash);
-
-            // Parse result
             const tokenAddress = this.parseTokenAddress(result);
+
+            const hasMetadata = !!(params.metadataUri ?? params.metadata);
+            const feeBreakdown = calculateFeeBreakdown(hasMetadata);
+            const totalFee = String(feeBreakdown.totalFee * 10_000_000); // XLM to stroops
 
             return {
                 tokenAddress,
@@ -56,9 +67,7 @@ export class StellarService {
                 timestamp: Date.now(),
             };
         } catch (error) {
-            const stellarError = parseStellarError(error);
-            logStellarError(stellarError, { params });
-            throw stellarError;
+            throw error instanceof Error ? error : new Error('Token deployment failed');
         }
     }
 
@@ -80,7 +89,7 @@ export class StellarService {
             throw new Error(`Simulation failed: ${simulatedTx.error}`);
         }
 
-
+        return simulatedTx as rpc.Api.SimulateTransactionSuccessResponse;
     }
 
     private async requestSignature(xdr: string): Promise<string> {
@@ -92,7 +101,14 @@ export class StellarService {
         return signedTxXdr;
     }
 
+    private async submitTransaction(transaction: any) {
+        const response = await this.server.sendTransaction(transaction);
 
+        if (response.status === 'ERROR') {
+            throw new Error('Transaction submission failed');
+        }
+
+        return response;
     }
 
     private async waitForConfirmation(hash: string): Promise<rpc.Api.GetTransactionResponse> {

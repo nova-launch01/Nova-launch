@@ -1,156 +1,105 @@
-import { useEffect, useState, lazy } from "react";
-import { Header, Container } from "./components/Layout";
-import { Button, Card, ErrorBoundary } from "./components/UI";
-import {
-  PWAInstallButton,
-  PWAUpdateNotification,
-  PWAConnectionStatus,
-} from "./components/PWA";
-import { TokenDeployForm } from "./components/TokenDeployForm";
-import {
-  TutorialOverlay,
-  CompletionCelebration,
-  TutorialSettings,
-  useTutorial,
-  deploymentTutorialSteps,
-} from "./components/Tutorial";
+import { Suspense, lazy, useEffect, useMemo, useState } from "react";
+import { useNetwork } from "./hooks/useNetwork";
 import { useWallet } from "./hooks/useWallet";
-import { truncateAddress } from "./utils/formatting";
+import { Spinner } from "./components/UI";
 
-const HomeRoute = lazy(() => import("./routes/HomeRoute"));
-const NotFoundRoute = lazy(() => import("./routes/NotFoundRoute"));
+// Lazy load below-the-fold components for performance
+const LandingPage = lazy(() => import("./pages/LandingPage").then(module => ({ default: module.default })));
+const NotFoundRoute = lazy(() => import("./routes/NotFoundRoute").then(module => ({ default: module.default })));
 
-function usePathname() {
-  const [pathname, setPathname] = useState(() => window.location.pathname);
+// Loading fallback for lazy-loaded components
+function PageLoader() {
+  return (
+    <div className="flex items-center justify-center min-h-screen bg-background-dark" role="status" aria-label="Loading page">
+      <Spinner size="lg" />
+      <span className="sr-only">Loading...</span>
+    </div>
+  );
+}
 
-  useEffect(() => {
-    const onPopState = () => setPathname(window.location.pathname);
-    window.addEventListener("popstate", onPopState);
-    return () => window.removeEventListener("popstate", onPopState);
-  }, []);
-
-  return pathname;
+function normalizePath(pathname: string): string {
+  if (pathname.length > 1 && pathname.endsWith("/")) {
+    return pathname.slice(0, -1);
+  }
+  return pathname || "/";
 }
 
 function App() {
-  const { wallet, connect, disconnect, isConnecting, error } = useWallet();
-  const [showCelebration, setShowCelebration] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
-  const tutorial = useTutorial(deploymentTutorialSteps);
-
-  const handleTutorialComplete = () => {
-    tutorial.complete();
-    setShowCelebration(true);
-  };
-
-  const handleCelebrationClose = () => {
-    setShowCelebration(false);
-  };
+  const [pathname, setPathname] = useState(() => normalizePath(window.location.pathname));
+  const { network } = useNetwork();
+  const { wallet, connect, disconnect, isConnecting } = useWallet({ network });
 
   useEffect(() => {
-    // Auto-start tutorial for first-time users
-    if (!tutorial.hasCompletedBefore) {
-      const timer = setTimeout(() => {
-        tutorial.start();
-      }, 1000);
-      return () => clearTimeout(timer);
+    const handlePopState = () => {
+      setPathname(normalizePath(window.location.pathname));
+    };
+
+    const handleInternalNavigation = (event: MouseEvent) => {
+      const target = event.target as HTMLElement | null;
+      const anchor = target?.closest("a[href]") as HTMLAnchorElement | null;
+
+      if (!anchor) {
+        return;
+      }
+
+      if (anchor.target && anchor.target !== "_self") {
+        return;
+      }
+
+      const href = anchor.getAttribute("href");
+      if (!href || href.startsWith("#")) {
+        return;
+      }
+
+      const url = new URL(anchor.href);
+      if (url.origin !== window.location.origin) {
+        return;
+      }
+
+      if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+        return;
+      }
+
+      event.preventDefault();
+
+      const nextPath = normalizePath(url.pathname);
+      if (nextPath !== pathname) {
+        window.history.pushState(null, "", `${nextPath}${url.search}${url.hash}`);
+        setPathname(nextPath);
+        window.scrollTo(0, 0);
+      }
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    document.addEventListener("click", handleInternalNavigation);
+
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+      document.removeEventListener("click", handleInternalNavigation);
+    };
+  }, [pathname]);
+
+  const page = useMemo(() => {
+    if (pathname === "/" || pathname === "/deploy") {
+      return (
+        <LandingPage
+          wallet={wallet}
+          connect={connect}
+          disconnect={disconnect}
+          isConnecting={isConnecting}
+        />
+      );
     }
-  }, [tutorial.hasCompletedBefore]);
+
+    return <NotFoundRoute />;
+  }, [pathname, wallet, connect, disconnect, isConnecting]);
 
   return (
-    <ErrorBoundary>
-      <a href="#main-content" className="skip-to-main">
-        Skip to main content
-      </a>
-      <div className="min-h-screen bg-gray-50">
-        <Header>
-          <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-4">
-            <PWAConnectionStatus />
-            <PWAInstallButton />
-            {!tutorial.hasCompletedBefore && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={tutorial.start}
-                data-tutorial="restart-tutorial"
-              >
-                Start Tutorial
-              </Button>
-            )}
-            {tutorial.hasCompletedBefore && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowSettings(true)}
-                title="Tutorial settings"
-              >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                </svg>
-              </Button>
-            )}
-            {wallet.connected && wallet.address ? (
-              <div className="flex items-center gap-2">
-                <Button variant="secondary" size="sm" disabled>
-                  {truncateAddress(wallet.address)}
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={disconnect}
-                  data-tutorial="connect-wallet"
-                >
-                  Disconnect
-                </Button>
-              </div>
-            ) : (
-              <Button
-                size="sm"
-                onClick={() => void connect()}
-                loading={isConnecting}
-                data-tutorial="connect-wallet"
-              >
-                Connect Wallet
-              </Button>
-            )}
-          </div>
-        </Header>
-        <main id="main-content">
-          <Container>
-            <Card title="Deploy Your Token">
-              {error ? (
-                <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-                  {error}
-                </div>
-              ) : null}
-              <TokenDeployForm
-                wallet={wallet}
-                onConnectWallet={connect}
-                isConnectingWallet={isConnecting}
-              />
-            </Card>
-          </Container>
-        </main>
-        <PWAUpdateNotification />
-
-        {/* Tutorial System */}
-        <TutorialOverlay
-          steps={deploymentTutorialSteps}
-          currentStep={tutorial.currentStep}
-          onNext={tutorial.next}
-          onPrevious={tutorial.previous}
-          onSkip={tutorial.skip}
-          onComplete={handleTutorialComplete}
-          isActive={tutorial.isActive}
-        />
-        <CompletionCelebration isOpen={showCelebration} onClose={handleCelebrationClose} />
-        <TutorialSettings
-          isOpen={showSettings}
-          onClose={() => setShowSettings(false)}
-          onResetTutorial={tutorial.reset}
-        />
+    <Suspense fallback={<PageLoader />}>
+      <div id="main-content" tabIndex={-1}>
+        {page}
       </div>
-    </ErrorBoundary>
+    </Suspense>
   );
 }
 

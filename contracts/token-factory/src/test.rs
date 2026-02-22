@@ -1,3 +1,6 @@
+// Token Factory Contract Tests
+// This file contains unit and integration tests for the TokenFactory contract.
+// Closes #59
 use super::*;
 use soroban_sdk::testutils::Address as _;
 use soroban_sdk::{Address, Env, String};
@@ -27,35 +30,35 @@ fn test_initialize() {
 #[test]
 fn test_initialize_with_various_fees() {
     let env = Env::default();
-    
+
     // Test with minimum fees
     let contract_id_1 = env.register_contract(None, TokenFactory);
     let client_1 = TokenFactoryClient::new(&env, &contract_id_1);
     let admin_1 = Address::generate(&env);
     let treasury_1 = Address::generate(&env);
-    
+
     client_1.initialize(&admin_1, &treasury_1, &1, &1);
     let state_1 = client_1.get_state();
     assert_eq!(state_1.base_fee, 1);
     assert_eq!(state_1.metadata_fee, 1);
-    
+
     // Test with high fees
     let contract_id_2 = env.register_contract(None, TokenFactory);
     let client_2 = TokenFactoryClient::new(&env, &contract_id_2);
     let admin_2 = Address::generate(&env);
     let treasury_2 = Address::generate(&env);
-    
+
     client_2.initialize(&admin_2, &treasury_2, &1_000_000_000, &500_000_000);
     let state_2 = client_2.get_state();
     assert_eq!(state_2.base_fee, 1_000_000_000);
     assert_eq!(state_2.metadata_fee, 500_000_000);
-    
+
     // Test with zero metadata fee
     let contract_id_3 = env.register_contract(None, TokenFactory);
     let client_3 = TokenFactoryClient::new(&env, &contract_id_3);
     let admin_3 = Address::generate(&env);
     let treasury_3 = Address::generate(&env);
-    
+
     client_3.initialize(&admin_3, &treasury_3, &50_000_000, &0);
     let state_3 = client_3.get_state();
     assert_eq!(state_3.base_fee, 50_000_000);
@@ -113,6 +116,7 @@ fn test_cannot_initialize_twice_with_different_params() {
     );
 }
 
+/// Tests for updating factory fee structure including base and metadata fees.
 #[test]
 fn test_update_fees() {
     let env = Env::default();
@@ -126,15 +130,47 @@ fn test_update_fees() {
 
     client.initialize(&admin, &treasury, &70_000_000, &30_000_000);
 
-    // Update base fee
+    // Update base fee only
     client.update_fees(&admin, &Some(100_000_000), &None);
     let state = client.get_state();
     assert_eq!(state.base_fee, 100_000_000);
+    assert_eq!(state.metadata_fee, 30_000_000); // Verify metadata fee unchanged
 
-    // Update metadata fee
+    // Update metadata fee only
     client.update_fees(&admin, &None, &Some(50_000_000));
     let state = client.get_state();
     assert_eq!(state.metadata_fee, 50_000_000);
+    assert_eq!(state.base_fee, 100_000_000); // Verify base fee unchanged
+
+    // Update both fees simultaneously
+    client.update_fees(&admin, &Some(80_000_000), &Some(40_000_000));
+    let state = client.get_state();
+    assert_eq!(state.base_fee, 80_000_000);
+    assert_eq!(state.metadata_fee, 40_000_000);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #2)")]
+fn test_unauthorized_fee_update() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract_id = env.register_contract(None, TokenFactory);
+    let client = TokenFactoryClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    let non_admin = Address::generate(&env);
+    let treasury = Address::generate(&env);
+
+    client.initialize(&admin, &treasury, &70_000_000, &30_000_000);
+
+    // Verify initial fees are set correctly
+    let state = client.get_state();
+    assert_eq!(state.base_fee, 70_000_000);
+    assert_eq!(state.metadata_fee, 30_000_000);
+
+    // Non-admin attempts to update fees - should panic with Unauthorized error (#2)
+    client.update_fees(&non_admin, &Some(100_000_000), &None);
 }
 
 #[test]

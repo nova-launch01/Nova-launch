@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { useWallet } from '../../hooks/useWallet';
 import { WalletService } from '../../services/wallet';
@@ -171,7 +171,9 @@ describe('useWallet hook', () => {
             await result.current.connect();
         });
 
-        unmount();
+        act(() => {
+            unmount();
+        });
 
         expect(cleanupFn).toHaveBeenCalled();
     });

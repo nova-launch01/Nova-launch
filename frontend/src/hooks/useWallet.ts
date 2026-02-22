@@ -4,23 +4,29 @@ import type { WalletState } from '../types';
 
 const WALLET_CONNECTED_KEY = 'nova_wallet_connected';
 
-export const useWallet = () => {
+interface UseWalletOptions {
+    network?: 'testnet' | 'mainnet';
+}
+
+export const useWallet = (options: UseWalletOptions = {}) => {
+    const { network: externalNetwork = 'testnet' } = options;
     const [wallet, setWallet] = useState<WalletState>({
         connected: false,
         address: null,
-        network: 'testnet',
+        network: externalNetwork,
     });
     const [isConnecting, setIsConnecting] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const cleanupRef = useRef<(() => void) | null>(null);
     const isInitializedRef = useRef(false);
+    const prevNetworkRef = useRef(externalNetwork);
 
     const disconnect = useCallback(() => {
-        setWallet({
+        setWallet((prev) => ({
             connected: false,
             address: null,
-            network: 'testnet',
-        });
+            network: prev.network,
+        }));
         setError(null);
         localStorage.removeItem(WALLET_CONNECTED_KEY);
 
@@ -29,6 +35,16 @@ export const useWallet = () => {
             cleanupRef.current = null;
         }
     }, []);
+
+    useEffect(() => {
+        if (prevNetworkRef.current !== externalNetwork) {
+            prevNetworkRef.current = externalNetwork;
+            if (wallet.connected) {
+                disconnect();
+            }
+            setWallet((prev) => ({ ...prev, network: externalNetwork }));
+        }
+    }, [externalNetwork, wallet.connected, disconnect]);
 
     const updateWalletState = useCallback(async () => {
         try {
@@ -92,7 +108,7 @@ export const useWallet = () => {
             setupListeners();
         } catch (err: any) {
             setError(err.message || 'Failed to connect wallet');
-            disconnect();
+            // Don't call disconnect() - we never connected, and it would clear the error
         } finally {
             setIsConnecting(false);
         }
@@ -103,18 +119,18 @@ export const useWallet = () => {
         isInitializedRef.current = true;
 
         const wasConnected = localStorage.getItem(WALLET_CONNECTED_KEY) === 'true';
-        if (!wasConnected) return;
+        if (wasConnected) {
+            (async () => {
+                const isInstalled = await WalletService.isInstalled();
+                if (!isInstalled) {
+                    localStorage.removeItem(WALLET_CONNECTED_KEY);
+                    return;
+                }
 
-        (async () => {
-            const isInstalled = await WalletService.isInstalled();
-            if (!isInstalled) {
-                localStorage.removeItem(WALLET_CONNECTED_KEY);
-                return;
-            }
-
-            const success = await updateWalletState();
-            if (success) setupListeners();
-        })();
+                const success = await updateWalletState();
+                if (success) setupListeners();
+            })();
+        }
 
         return () => {
             if (cleanupRef.current) {

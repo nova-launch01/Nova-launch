@@ -84,7 +84,7 @@ class TutorialAnalytics {
         };
     }
 
-    static getStoredAnalytics(): TutorialEvent[] {
+    getStoredAnalytics(): TutorialEvent[] {
         try {
             const data = localStorage.getItem('stellar_tutorial_analytics');
             return data ? JSON.parse(data) : [];
@@ -93,7 +93,7 @@ class TutorialAnalytics {
         }
     }
 
-    static clearAnalytics() {
+    clearAnalytics() {
         localStorage.removeItem('stellar_tutorial_analytics');
     }
 }

@@ -117,6 +117,10 @@ export function BasicInfoStep({ onNext, initialData }: BasicInfoStepProps) {
         formData.initialSupply &&
         formData.adminWallet;
 
+    const getSuccess = (field: keyof BasicInfoData): boolean => {
+        return touched[field] && !errors[field] && formData[field] !== '';
+    };
+
     return (
         <form onSubmit={handleSubmit} className="space-y-6">
             <Input
@@ -125,6 +129,7 @@ export function BasicInfoStep({ onNext, initialData }: BasicInfoStepProps) {
                 onChange={(e) => handleChange('name', e.target.value)}
                 onBlur={() => handleBlur('name')}
                 error={touched.name ? errors.name : ''}
+                success={getSuccess('name')}
                 helperText="1-32 characters, alphanumeric with spaces and hyphens"
                 placeholder="My Awesome Token"
                 maxLength={32}
@@ -137,6 +142,7 @@ export function BasicInfoStep({ onNext, initialData }: BasicInfoStepProps) {
                 onChange={(e) => handleChange('symbol', e.target.value)}
                 onBlur={() => handleBlur('symbol')}
                 error={touched.symbol ? errors.symbol : ''}
+                success={getSuccess('symbol')}
                 helperText="1-12 uppercase letters (e.g., BTC, ETH)"
                 placeholder="MAT"
                 maxLength={12}
@@ -150,6 +156,7 @@ export function BasicInfoStep({ onNext, initialData }: BasicInfoStepProps) {
                 onChange={(e) => handleChange('decimals', parseInt(e.target.value) || 0)}
                 onBlur={() => handleBlur('decimals')}
                 error={touched.decimals ? errors.decimals : ''}
+                success={getSuccess('decimals')}
                 helperText="Number of decimal places (0-18, typically 7)"
                 min={0}
                 max={18}
@@ -162,6 +169,7 @@ export function BasicInfoStep({ onNext, initialData }: BasicInfoStepProps) {
                 onChange={(e) => handleChange('initialSupply', e.target.value)}
                 onBlur={() => handleBlur('initialSupply')}
                 error={touched.initialSupply ? errors.initialSupply : ''}
+                success={getSuccess('initialSupply')}
                 helperText="Total tokens to mint initially"
                 placeholder="1000000"
                 required
@@ -173,6 +181,7 @@ export function BasicInfoStep({ onNext, initialData }: BasicInfoStepProps) {
                 onChange={(e) => handleChange('adminWallet', e.target.value)}
                 onBlur={() => handleBlur('adminWallet')}
                 error={touched.adminWallet ? errors.adminWallet : ''}
+                success={getSuccess('adminWallet')}
                 helperText="Stellar address that will control the token (starts with G)"
                 placeholder="GXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
                 required

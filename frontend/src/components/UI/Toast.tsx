@@ -1,23 +1,56 @@
-import { useEffect } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import type { ToastType } from '../../providers/ToastProvider';
 
 interface ToastProps {
+    id: string;
     message: string;
-    type?: 'success' | 'error' | 'info' | 'warning';
-    onClose: () => void;
+    type?: ToastType;
+    onClose: (id: string) => void;
     duration?: number;
 }
 
-export function Toast({ message, type = 'info', onClose, duration = 5000 }: ToastProps) {
+export function Toast({ id, message, type = 'info', onClose, duration = 5000 }: ToastProps) {
+    const [isVisible, setIsVisible] = useState(false);
+    const [isExiting, setIsExiting] = useState(false);
+    const closeTimerRef = useRef<number | null>(null);
+
+    const dismiss = useCallback(() => {
+        if (isExiting) {
+            return;
+        }
+
+        setIsExiting(true);
+        closeTimerRef.current = window.setTimeout(() => {
+            onClose(id);
+        }, 180);
+    }, [id, isExiting, onClose]);
+
     useEffect(() => {
-        const timer = setTimeout(onClose, duration);
-        return () => clearTimeout(timer);
-    }, [duration, onClose]);
+        const frame = window.requestAnimationFrame(() => {
+            setIsVisible(true);
+        });
+        return () => window.cancelAnimationFrame(frame);
+    }, []);
+
+    useEffect(() => {
+        const timer = window.setTimeout(dismiss, duration);
+        return () => window.clearTimeout(timer);
+    }, [dismiss, duration]);
+
+    useEffect(
+        () => () => {
+            if (closeTimerRef.current !== null) {
+                window.clearTimeout(closeTimerRef.current);
+            }
+        },
+        []
+    );
 
     const typeStyles = {
-        success: 'bg-green-500 text-white',
-        error: 'bg-red-500 text-white',
-        info: 'bg-blue-500 text-white',
-        warning: 'bg-yellow-500 text-gray-900',
+        success: 'bg-green-600 text-white',
+        error: 'bg-red-600 text-white',
+        info: 'bg-blue-600 text-white',
+        warning: 'bg-amber-400 text-gray-900',
     };
 
     const icons = {
@@ -61,15 +94,18 @@ export function Toast({ message, type = 'info', onClose, duration = 5000 }: Toas
 
     return (
         <div
-            className={`fixed bottom-4 right-4 z-50 flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg ${typeStyles[type]} animate-slide-up`}
-            role="alert"
+            className={`pointer-events-auto flex w-full items-center gap-3 rounded-lg px-4 py-3 shadow-lg transition-all duration-200 ease-out ${typeStyles[type]} ${
+                isVisible && !isExiting ? 'translate-y-0 opacity-100' : 'translate-y-2 opacity-0'
+            }`}
+            role={type === 'error' || type === 'warning' ? 'alert' : 'status'}
+            aria-live={type === 'error' || type === 'warning' ? 'assertive' : 'polite'}
         >
             {icons[type]}
             <span className="text-sm font-medium">{message}</span>
             <button
-                onClick={onClose}
+                onClick={dismiss}
                 className="ml-2 hover:opacity-75 transition-opacity"
-                aria-label="Close notification"
+                aria-label="Dismiss notification"
             >
                 <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                     <path

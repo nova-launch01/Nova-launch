@@ -1,97 +1,137 @@
 import * as StellarSdk from '@stellar/stellar-sdk';
-import type { TokenInfo, TransactionDetails } from '../types';
-
-const TESTNET_HORIZON = 'https://horizon-testnet.stellar.org';
-const MAINNET_HORIZON = 'https://horizon.stellar.org';
-
-const POLL_INTERVAL_MS = 2000;
-const MAX_POLL_TIME_MS = 60000;
-const MAX_BACKOFF_MS = 10000;
+import { STELLAR_CONFIG, getNetworkConfig } from '../config/stellar';
+import type { TokenInfo, TransactionDetails, AppError } from '../types';
+import { ErrorCode } from '../types';
 
 export class StellarService {
-  private horizonUrl: string;
+  private network: 'testnet' | 'mainnet';
+  private server: StellarSdk.SorobanRpc.Server;
+  private horizonServer: StellarSdk.Horizon.Server;
+  private networkPassphrase: string;
+  private contractClient: StellarSdk.Contract | null = null;
 
   constructor(network: 'testnet' | 'mainnet' = 'testnet') {
-    this.horizonUrl = network === 'testnet' ? TESTNET_HORIZON : MAINNET_HORIZON;
+    this.network = network;
+    const config = getNetworkConfig(network);
+    
+    this.server = new StellarSdk.SorobanRpc.Server(config.sorobanRpcUrl);
+    this.horizonServer = new StellarSdk.Horizon.Server(config.horizonUrl);
+    this.networkPassphrase = config.networkPassphrase;
+    
+    this.initializeContractClient();
+  }
+
+  private initializeContractClient(): void {
+    const contractId = STELLAR_CONFIG.factoryContractId;
+    if (!contractId) {
+      console.warn('Factory contract ID not configured');
+      return;
+    }
+
+    try {
+      this.contractClient = new StellarSdk.Contract(contractId);
+    } catch (error) {
+      throw this.createError(
+        ErrorCode.CONTRACT_ERROR,
+        'Failed to initialize contract client',
+        error instanceof Error ? error.message : undefined
+      );
+    }
+  }
+
+  switchNetwork(network: 'testnet' | 'mainnet'): void {
+    if (this.network === network) return;
+
+    this.network = network;
+    const config = getNetworkConfig(network);
+    
+    this.server = new StellarSdk.SorobanRpc.Server(config.sorobanRpcUrl);
+    this.horizonServer = new StellarSdk.Horizon.Server(config.horizonUrl);
+    this.networkPassphrase = config.networkPassphrase;
+    
+    this.initializeContractClient();
+  }
+
+  getNetwork(): 'testnet' | 'mainnet' {
+    return this.network;
+  }
+
+  getContractClient(): StellarSdk.Contract {
+    if (!this.contractClient) {
+      throw this.createError(
+        ErrorCode.CONTRACT_ERROR,
+        'Contract client not initialized',
+        'Factory contract ID not configured'
+      );
+    }
+    return this.contractClient;
   }
 
   async getTokenInfo(tokenAddress: string): Promise<TokenInfo> {
     try {
       StellarSdk.Address.fromString(tokenAddress);
     } catch {
-      throw new Error('Invalid token address');
+      throw this.createError(ErrorCode.INVALID_INPUT, 'Invalid token address');
     }
 
-    // Fetch transaction history to get deployment info
-    const txHistory = await fetch(`${this.horizonUrl}/accounts/${tokenAddress}/transactions?limit=1&order=asc`);
-    const txData = await txHistory.json();
-    const firstTx = txData._embedded?.records?.[0];
+    try {
+      const txHistory = await this.horizonServer
+        .transactions()
+        .forAccount(tokenAddress)
+        .limit(1)
+        .order('asc')
+        .call();
 
-    // For now, return basic info from Horizon
-    // In production, this would query the contract via Soroban RPC
-    return {
-      address: tokenAddress,
-      name: '', // Would be fetched from contract
-      symbol: '', // Would be fetched from contract
-      decimals: 7, // Would be fetched from contract
-      totalSupply: '0', // Would be fetched from contract
-      creator: firstTx?.source_account || '',
-      metadataUri: undefined,
-      deployedAt: firstTx ? new Date(firstTx.created_at).getTime() : Date.now(),
-      transactionHash: firstTx?.hash || '',
-    };
+      const firstTx = txHistory.records[0];
+
+      return {
+        address: tokenAddress,
+        name: '',
+        symbol: '',
+        decimals: 7,
+        totalSupply: '0',
+        creator: firstTx?.source_account || '',
+        metadataUri: undefined,
+        deployedAt: firstTx ? new Date(firstTx.created_at).getTime() : Date.now(),
+        transactionHash: firstTx?.hash || '',
+      };
+    } catch (error) {
+      throw this.createError(
+        ErrorCode.NETWORK_ERROR,
+        'Failed to fetch token info',
+        error instanceof Error ? error.message : undefined
+      );
+    }
   }
 
-  async monitorTransaction(
-    hash: string,
-    onProgress?: (status: TransactionDetails) => void
-  ): Promise<TransactionDetails> {
-    const startTime = Date.now();
-    let backoff = POLL_INTERVAL_MS;
-
-    while (Date.now() - startTime < MAX_POLL_TIME_MS) {
-      try {
-        const response = await fetch(`${this.horizonUrl}/transactions/${hash}`);
-        
-        if (response.ok) {
-          const tx = await response.json();
-          const result: TransactionDetails = {
-            hash,
-            status: tx.successful ? 'success' : 'failed',
-            timestamp: new Date(tx.created_at).getTime(),
-            fee: tx.fee_charged || '0',
-          };
-          onProgress?.(result);
-          return result;
-        }
-
-        if (response.status === 404) {
-          const pending: TransactionDetails = {
-            hash,
-            status: 'pending',
-            timestamp: Date.now(),
-            fee: '0',
-          };
-          onProgress?.(pending);
-          await this.sleep(backoff);
-          backoff = Math.min(backoff * 1.5, MAX_BACKOFF_MS);
-          continue;
-        }
-
-        throw new Error(`HTTP ${response.status}`);
-      } catch {
-        if (Date.now() - startTime >= MAX_POLL_TIME_MS) {
-          throw new Error('Transaction monitoring timeout');
-        }
-        await this.sleep(backoff);
-        backoff = Math.min(backoff * 1.5, MAX_BACKOFF_MS);
+  async getTransaction(hash: string): Promise<TransactionDetails> {
+    try {
+      const tx = await this.horizonServer.transactions().transaction(hash).call();
+      
+      return {
+        hash,
+        status: tx.successful ? 'success' : 'failed',
+        timestamp: new Date(tx.created_at).getTime(),
+        fee: tx.fee_charged || '0',
+      };
+    } catch (error) {
+      if (error instanceof StellarSdk.NotFoundError) {
+        return {
+          hash,
+          status: 'pending',
+          timestamp: Date.now(),
+          fee: '0',
+        };
       }
+      throw this.createError(
+        ErrorCode.NETWORK_ERROR,
+        'Failed to fetch transaction',
+        error instanceof Error ? error.message : undefined
+      );
     }
-
-    throw new Error('Transaction monitoring timeout');
   }
 
-  private sleep(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
+  private createError(code: string, message: string, details?: string): AppError {
+    return { code, message, details };
   }
 }

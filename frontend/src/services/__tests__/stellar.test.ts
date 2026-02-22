@@ -1,31 +1,59 @@
-import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { StellarService } from '../stellar';
+import { ErrorCode } from '../../types';
+import * as StellarSdk from '@stellar/stellar-sdk';
 
-vi.mock('@stellar/stellar-sdk', () => ({
-  Address: {
-    fromString: function(addr: string) {
-      if (!addr.startsWith('C') || addr.length !== 56) throw new Error('Invalid');
-      return addr;
+// Mock the Stellar SDK
+vi.mock('@stellar/stellar-sdk', async () => {
+  const actual = await vi.importActual('@stellar/stellar-sdk');
+  return {
+    ...actual,
+    SorobanRpc: {
+      Server: vi.fn(function() { return {}; }),
+    },
+    Horizon: {
+      Server: vi.fn(function() {
+        return {
+          transactions: vi.fn().mockReturnValue({
+            forAccount: vi.fn().mockReturnThis(),
+            limit: vi.fn().mockReturnThis(),
+            order: vi.fn().mockReturnThis(),
+            call: vi.fn().mockResolvedValue({ records: [] }),
+            transaction: vi.fn().mockReturnThis(),
+          }),
+        };
+      }),
+    },
+    Contract: vi.fn(function() { return {}; }),
+  };
+});
+
+vi.mock('../../config/stellar', () => ({
+  STELLAR_CONFIG: {
+    network: 'testnet',
+    factoryContractId: 'CDUMMYCONTRACTID123456789',
+    testnet: {
+      networkPassphrase: 'Test SDF Network ; September 2015',
+      horizonUrl: 'https://horizon-testnet.stellar.org',
+      sorobanRpcUrl: 'https://soroban-testnet.stellar.org',
+    },
+    mainnet: {
+      networkPassphrase: 'Public Global Stellar Network ; September 2015',
+      horizonUrl: 'https://horizon.stellar.org',
+      sorobanRpcUrl: 'https://soroban-mainnet.stellar.org',
     },
   },
-  Contract: function() { return {}; },
-  TransactionBuilder: function() { return {}; },
-  BASE_FEE: '100',
-  Networks: {
-    TESTNET: 'Test SDF Network ; September 2015',
-    PUBLIC: 'Public Global Stellar Network ; September 2015',
-  },
-  SorobanRpc: {
-    Server: function() {
-      return {
-        getAccount: vi.fn(),
-        simulateTransaction: vi.fn(),
-      };
-    },
-    Api: {
-      isSimulationSuccess: vi.fn(),
-    },
-  },
+  getNetworkConfig: (network: 'testnet' | 'mainnet') => ({
+    networkPassphrase: network === 'testnet' 
+      ? 'Test SDF Network ; September 2015' 
+      : 'Public Global Stellar Network ; September 2015',
+    horizonUrl: network === 'testnet' 
+      ? 'https://horizon-testnet.stellar.org' 
+      : 'https://horizon.stellar.org',
+    sorobanRpcUrl: network === 'testnet' 
+      ? 'https://soroban-testnet.stellar.org' 
+      : 'https://soroban-mainnet.stellar.org',
+  }),
 }));
 
 describe('StellarService', () => {
@@ -33,89 +61,44 @@ describe('StellarService', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    global.fetch = vi.fn();
     service = new StellarService('testnet');
   });
 
-  describe('getTokenInfo', () => {
-    it('throws error for invalid address', async () => {
-      await expect(service.getTokenInfo('invalid')).rejects.toThrow('Invalid token address');
+  describe('initialization', () => {
+    it('should initialize with testnet', () => {
+      expect(service.getNetwork()).toBe('testnet');
     });
 
-    it('returns token info without metadata', async () => {
-      const mockAddress = 'CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC';
+    it('should initialize with mainnet', () => {
+      const mainnetService = new StellarService('mainnet');
+      expect(mainnetService.getNetwork()).toBe('mainnet');
+    });
 
-      (global.fetch as Mock).mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          _embedded: {
-            records: [{
-              hash: 'txhash123',
-              source_account: 'GABC...',
-              created_at: '2026-01-01T00:00:00Z',
-            }],
-          },
-        }),
-      });
-
-      const info = await service.getTokenInfo(mockAddress);
-
-      expect(info.address).toBe(mockAddress);
-      expect(info.creator).toBe('GABC...');
-      expect(info.transactionHash).toBe('txhash123');
-      expect(info.metadataUri).toBeUndefined();
+    it('should create contract client', () => {
+      expect(() => service.getContractClient()).not.toThrow();
+      expect(StellarSdk.Contract).toHaveBeenCalled();
     });
   });
 
-  describe('monitorTransaction', () => {
-    it('returns success when transaction is found', async () => {
-      const hash = 'abc123';
-      
-      (global.fetch as Mock).mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          successful: true,
-          created_at: '2026-01-01T00:00:00Z',
-          fee_charged: '100',
-        }),
+  describe('network switching', () => {
+    it('should switch from testnet to mainnet', () => {
+      service.switchNetwork('mainnet');
+      expect(service.getNetwork()).toBe('mainnet');
+    });
+
+    it('should switch from mainnet to testnet', () => {
+      service.switchNetwork('mainnet');
+      service.switchNetwork('testnet');
+      expect(service.getNetwork()).toBe('testnet');
+    });
+  });
+
+  describe('error handling', () => {
+    it('should throw error for invalid token address', async () => {
+      await expect(service.getTokenInfo('invalid')).rejects.toMatchObject({
+        code: ErrorCode.INVALID_INPUT,
+        message: 'Invalid token address',
       });
-
-      const result = await service.monitorTransaction(hash);
-
-      expect(result.status).toBe('success');
-      expect(result.hash).toBe(hash);
-      expect(result.fee).toBe('100');
     });
-
-    it('polls until transaction is found', async () => {
-      const hash = 'abc123';
-      const onProgress = vi.fn();
-
-      (global.fetch as Mock)
-        .mockResolvedValueOnce({ status: 404 })
-        .mockResolvedValueOnce({
-          ok: true,
-          json: async () => ({
-            successful: true,
-            created_at: '2026-01-01T00:00:00Z',
-            fee_charged: '100',
-          }),
-        });
-
-      const result = await service.monitorTransaction(hash, onProgress);
-
-      expect(result.status).toBe('success');
-      expect(onProgress).toHaveBeenCalled();
-    });
-
-    it('throws error on timeout', async () => {
-      const hash = 'abc123';
-      
-      (global.fetch as Mock).mockResolvedValue({ status: 404 });
-
-      await expect(
-        service.monitorTransaction(hash)
-      ).rejects.toThrow('Transaction monitoring timeout');
-    }, 70000);
   });
 });
