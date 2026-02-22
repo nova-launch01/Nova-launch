@@ -120,6 +120,7 @@ impl TokenFactory {
             symbol,
             decimals,
             total_supply: initial_supply,
+            total_burned: 0,
             metadata_uri,
             created_at: env.ledger().timestamp(),
         };
@@ -147,6 +148,101 @@ impl TokenFactory {
         storage::set_token_info(&env, index, &info);
 
         Ok(())
+    }
+
+    /// Burn tokens from the specified address
+    pub fn burn(
+        env: Env,
+        token_address: Address,
+        from: Address,
+        amount: i128,
+    ) -> Result<(), Error> {
+        from.require_auth();
+
+        if amount <= 0 {
+            return Err(Error::InvalidBurnAmount);
+        }
+
+        let count = storage::get_token_count(&env);
+        let mut found = false;
+        
+        for i in 0..count {
+            if let Some(mut info) = storage::get_token_info(&env, i) {
+                if info.address == token_address {
+                    if amount > info.total_supply {
+                        return Err(Error::BurnAmountExceedsBalance);
+                    }
+                    info.total_supply -= amount;
+                    info.total_burned += amount;
+                    storage::set_token_info(&env, i, &info);
+                    found = true;
+                    break;
+                }
+            }
+        }
+
+        if !found {
+            return Err(Error::TokenNotFound);
+        }
+
+        Ok(())
+    }
+
+    /// Admin burn tokens from any address
+    pub fn admin_burn(
+        env: Env,
+        token_address: Address,
+        admin: Address,
+        from: Address,
+        amount: i128,
+    ) -> Result<(), Error> {
+        admin.require_auth();
+
+        if amount <= 0 {
+            return Err(Error::InvalidBurnAmount);
+        }
+
+        let count = storage::get_token_count(&env);
+        let mut found = false;
+        
+        for i in 0..count {
+            if let Some(mut info) = storage::get_token_info(&env, i) {
+                if info.address == token_address {
+                    if admin != info.creator {
+                        return Err(Error::Unauthorized);
+                    }
+                    if amount > info.total_supply {
+                        return Err(Error::BurnAmountExceedsBalance);
+                    }
+                    info.total_supply -= amount;
+                    info.total_burned += amount;
+                    storage::set_token_info(&env, i, &info);
+                    found = true;
+                    break;
+                }
+            }
+        }
+
+        if !found {
+            return Err(Error::TokenNotFound);
+        }
+
+        Ok(())
+    }
+
+    /// Get token info by address
+    pub fn get_token_info_by_address(env: Env, token_address: Address) -> Result<TokenInfo, Error> {
+        let count = storage::get_token_count(&env);
+        
+        for i in 0..count {
+            if let Some(info) = storage::get_token_info(&env, i) {
+                if info.address == token_address {
+                    return Ok(info);
+                }
+            }
+        }
+
+        Err(Error::TokenNotFound)
     }
 }
 
