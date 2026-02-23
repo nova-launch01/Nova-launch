@@ -6,7 +6,9 @@ import {
     nativeToScVal,
     rpc,
     Transaction,
+    Transaction,
 } from '@stellar/stellar-sdk';
+import type { TokenDeployParams, DeploymentResult } from '../types';
 import type { TokenDeployParams, DeploymentResult } from '../types';
 import { STELLAR_CONFIG, getNetworkConfig } from '../config/stellar';
 import { getDeploymentFeeBreakdown as calculateFeeBreakdown } from '../utils/feeCalculation';
@@ -42,6 +44,30 @@ export class StellarService {
                         nativeToScVal(params.decimals, { type: 'u32' }),
                         nativeToScVal(params.initialSupply, { type: 'i128' }),
                         nativeToScVal(params.adminWallet, { type: 'address' }),
+                    )        try {
+            // Calculate fees
+            const hasMetadata = !!params.metadata;
+            const feeBreakdown = calculateFeeBreakdown(hasMetadata);
+            const totalFee = feeBreakdown.totalFee.toString();
+
+            // Get source account
+            const sourceAccount = await this.getAccount(params.adminWallet);
+
+            // Load contract
+            const contract = new Contract(STELLAR_CONFIG.factoryContractId);
+
+            // Build transaction
+            const transaction = new TransactionBuilder(sourceAccount, {
+                fee: BASE_FEE,
+                networkPassphrase: this.networkPassphrase,
+            })
+                .addOperation(
+                    contract.call(
+                        'deploy_token',
+                        nativeToScVal(params.name, { type: 'string' }),
+                        nativeToScVal(params.symbol, { type: 'string' }),
+                        nativeToScVal(params.decimals, { type: 'u32' }),
+                        nativeToScVal(params.initialSupply, { type: 'i128' })
                     )
                 )
                 .setTimeout(180)
@@ -51,6 +77,7 @@ export class StellarService {
             const preparedTx = rpc.assembleTransaction(transaction, simulatedTx).build();
 
             const signedXdr = await this.requestSignature(preparedTx.toXDR());
+            const signedTx = TransactionBuilder.fromXDR(signedXdr, this.networkPassphrase) as Transaction;
             const signedTx = TransactionBuilder.fromXDR(signedXdr, this.networkPassphrase) as Transaction;
 
             const response = await this.submitTransaction(signedTx);
@@ -68,6 +95,7 @@ export class StellarService {
                 timestamp: Date.now(),
             };
         } catch (error) {
+            throw new Error(`Token deployment failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
             throw error instanceof Error ? error : new Error('Token deployment failed');
         }
     }
@@ -90,6 +118,7 @@ export class StellarService {
             throw new Error(`Simulation failed: ${simulatedTx.error}`);
         }
 
+        return simulatedTx;
         return simulatedTx as rpc.Api.SimulateTransactionSuccessResponse;
     }
 
@@ -104,8 +133,20 @@ export class StellarService {
         
         if (response.status === 'ERROR') {
             throw new Error(`Transaction submission failed: ${response.errorResult}`);
+    private async requestSignature(_xdr: string): Promise<string> {
+        // This would integrate with a wallet like Freighter
+        // For now, throw an error indicating wallet integration is needed
+        throw new Error('Wallet integration required - please connect a Stellar wallet');
+    }
+
+    private async submitTransaction(transaction: ReturnType<typeof TransactionBuilder.prototype.build>) {
+        const response = await this.server.sendTransaction(transaction);
+        
+        if (response.status === 'ERROR') {
+            throw new Error(`Transaction submission failed: ${response.errorResult}`);
         }
 
+        return response;
         return signedTxXdr;
     }
 
