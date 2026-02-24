@@ -48,6 +48,8 @@ impl TokenFactory {
     /// Allows the current admin to transfer administrative control to a new address.
     /// This is a critical operation that permanently changes who can manage the factory.
     ///
+    /// Implements #217, #224
+    ///
     /// # Arguments
     /// * `current_admin` - The current admin address (must authorize)
     /// * `new_admin` - The new admin address to transfer rights to
