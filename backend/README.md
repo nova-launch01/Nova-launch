@@ -69,6 +69,96 @@ npm test
 
 ## API Endpoints
 
+### Token Leaderboard API
+
+Public endpoints for token rankings and leaderboards. No authentication required.
+
+#### GET /api/leaderboard/most-burned
+
+Returns tokens with the highest burn volume.
+
+**Query Parameters:**
+- `period` - Time period: `24h`, `7d`, `30d`, `all` (default: `7d`)
+- `page` - Page number: 1-100 (default: `1`)
+- `limit` - Results per page: 1-100 (default: `10`)
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "rank": 1,
+      "token": {
+        "address": "0x123...",
+        "name": "Token Name",
+        "symbol": "TKN",
+        "decimals": 18,
+        "totalSupply": "1000000000",
+        "totalBurned": "50000000",
+        "burnCount": 125,
+        "metadataUri": "ipfs://...",
+        "createdAt": "2024-01-01T00:00:00.000Z"
+      },
+      "metric": "50000000"
+    }
+  ],
+  "period": "7d",
+  "updatedAt": "2024-02-24T12:00:00.000Z",
+  "pagination": {
+    "page": 1,
+    "limit": 10,
+    "total": 45
+  }
+}
+```
+
+#### GET /api/leaderboard/most-active
+
+Returns tokens with the most burn transactions.
+
+**Query Parameters:** Same as most-burned
+
+**Metric:** Number of burn transactions
+
+#### GET /api/leaderboard/newest
+
+Returns recently created tokens.
+
+**Query Parameters:**
+- `page` - Page number
+- `limit` - Results per page
+
+**Metric:** Creation timestamp
+
+#### GET /api/leaderboard/largest-supply
+
+Returns tokens with the highest total supply.
+
+**Query Parameters:** Same as newest
+
+**Metric:** Total supply amount
+
+#### GET /api/leaderboard/most-burners
+
+Returns tokens with the most unique burners.
+
+**Query Parameters:** Same as most-burned
+
+**Metric:** Number of unique addresses that burned tokens
+
+**Features:**
+- ✅ Server-side caching (5-minute TTL)
+- ✅ Rate limiting (100 requests per 15 minutes)
+- ✅ Optimized database queries with indexes
+- ✅ Comprehensive error handling
+
+**Documentation:**
+- [Full API Documentation](LEADERBOARD_API.md)
+- [Quick Reference](LEADERBOARD_QUICK_REF.md)
+
+---
+
 ### Authentication
 
 All admin endpoints require authentication via Bearer token:

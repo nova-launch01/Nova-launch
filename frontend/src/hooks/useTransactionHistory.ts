@@ -1,6 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-// Assuming you have a wallet hook to get the current address
-// import { useWallet } from './useWallet'; 
+import { useWallet } from './useWallet';
 
 export interface Transaction {
   id: string;
@@ -13,7 +12,8 @@ export interface Transaction {
 }
 
 export const useTransactionHistory = () => {
-  const { address } = useWallet();
+  const { wallet } = useWallet();
+  const address = wallet.address;
   const [history, setHistory] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
 
