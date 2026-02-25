@@ -403,6 +403,7 @@ impl TokenFactory {
 
 #[cfg(test)]
 mod admin_transfer_test;
+mod event_tests;
 
 #[cfg(test)]
 mod pause_test;
