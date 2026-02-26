@@ -5,7 +5,7 @@
 
 use soroban_sdk::{
     symbol_short,
-    testutils::Address as _,
+    testutils::{Address as _, Events},
     Address, Env, String, Vec,
 };
 use crate::{TokenFactory, TokenFactoryClient};
@@ -238,10 +238,10 @@ fn test_multiple_events_ordered() {
     let t2 = events.get(2).unwrap().0.get(0).unwrap();
     let t3 = events.get(3).unwrap().0.get(0).unwrap();
 
-    assert_eq!(t0, soroban_sdk::Val::from(symbol_short!("fees_updated")));
-    assert_eq!(t1, soroban_sdk::Val::from(symbol_short!("pause")));
-    assert_eq!(t2, soroban_sdk::Val::from(symbol_short!("unpause")));
-    assert_eq!(t3, soroban_sdk::Val::from(symbol_short!("admin_xfer")));
+    assert_eq!(t0, symbol_short!("fees_upd").to_val());
+    assert_eq!(t1, symbol_short!("pause").to_val());
+    assert_eq!(t2, symbol_short!("unpause").to_val());
+    assert_eq!(t3, symbol_short!("adm_xfer").to_val());
 }
 
 // ── No Event on Read-Only Functions ──────────────────────────────────────
