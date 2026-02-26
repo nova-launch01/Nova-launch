@@ -38,6 +38,9 @@ impl TokenFactory {
         storage::set_base_fee(&env, base_fee);
         storage::set_metadata_fee(&env, metadata_fee);
 
+        // Emit initialized event
+        events::emit_initialized(&env, &admin, &treasury, base_fee, metadata_fee);
+
         Ok(())
     }
 
@@ -379,10 +382,6 @@ impl TokenFactory {
         burn::burn(&env, caller, token_index, amount)
     }
 
-    pub fn admin_burn(env: Env, admin: Address, token_index: u32, holder: Address, amount: i128) -> Result<(), Error> {
-        burn::admin_burn(&env, admin, token_index, holder, amount)
-    }
-
     pub fn batch_burn(env: Env, admin: Address, token_index: u32, burns: soroban_sdk::Vec<(Address, i128)>) -> Result<(), Error> {
         burn::batch_burn(&env, admin, token_index, burns)
     }
@@ -421,6 +420,9 @@ mod fuzz_update_fees;
 
 #[cfg(test)]
 mod burn_property_test;
+
+#[cfg(test)]
+mod state_events_test;
 
 #[cfg(test)]
 mod fuzz_string_boundaries;
