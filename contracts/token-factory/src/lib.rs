@@ -45,6 +45,9 @@ impl TokenFactory {
         storage::set_base_fee(&env, base_fee);
         storage::set_metadata_fee(&env, metadata_fee);
 
+        // Emit initialized event
+        events::emit_initialized(&env, &admin, &treasury, base_fee, metadata_fee);
+
         Ok(())
     }
 
@@ -384,6 +387,11 @@ mod fuzz_update_fees;
 // #[cfg(test)]
 // mod burn_property_test;
 
+#[cfg(test)]
+mod state_events_test;
+
+#[cfg(test)]
+mod fuzz_string_boundaries;
 // Temporarily disabled - has compilation errors
 // #[cfg(test)]
 // mod fuzz_string_boundaries;
