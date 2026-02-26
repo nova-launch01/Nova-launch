@@ -27,6 +27,12 @@ model Token {
 
   @@index([address])
   @@index([creator])
+  @@index([createdAt])
+  @@index([totalSupply])
+  @@index([totalBurned])
+  @@index([burnCount])
+  @@index([name])
+  @@index([symbol])
 }
 
 model BurnRecord {

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { Database } from "../../config/database";
 import { authenticateAdmin, requireSuperAdmin } from "../../middleware/auth";
 import { auditLog } from "../../middleware/auditLog";
+import { successResponse, errorResponse } from "../../utils/response";
 
 const router = Router();
 
@@ -49,18 +50,29 @@ router.get(
         );
       }
 
-      res.json({
-        tokens,
-        total: tokens.length,
-      });
+      res.json(
+        successResponse({
+          tokens,
+          total: tokens.length,
+        })
+      );
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res
-          .status(400)
-          .json({ error: "Invalid filters", details: error.errors });
+        return res.status(400).json(
+          errorResponse({
+            code: "VALIDATION_ERROR",
+            message: "Invalid filters",
+            details: error.errors,
+          })
+        );
       }
       console.error("Error fetching tokens:", error);
-      res.status(500).json({ error: "Failed to fetch tokens" });
+      res.status(500).json(
+        errorResponse({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to fetch tokens",
+        })
+      );
     }
   }
 );
@@ -75,27 +87,39 @@ router.get(
       const token = await Database.findTokenById(req.params.id);
 
       if (!token) {
-        return res.status(404).json({ error: "Token not found" });
+        return res.status(404).json(
+          errorResponse({
+            code: "NOT_FOUND",
+            message: "Token not found",
+          })
+        );
       }
 
       // Get creator info
       const creator = await Database.findUserByAddress(token.creatorAddress);
 
-      res.json({
-        token,
-        creator: creator
-          ? {
-              id: creator.id,
-              address: creator.address,
-              role: creator.role,
-              banned: creator.banned,
-              createdAt: creator.createdAt,
-            }
-          : null,
-      });
+      res.json(
+        successResponse({
+          token,
+          creator: creator
+            ? {
+                id: creator.id,
+                address: creator.address,
+                role: creator.role,
+                banned: creator.banned,
+                createdAt: creator.createdAt,
+              }
+            : null,
+        })
+      );
     } catch (error) {
       console.error("Error fetching token:", error);
-      res.status(500).json({ error: "Failed to fetch token" });
+      res.status(500).json(
+        errorResponse({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to fetch token",
+        })
+      );
     }
   }
 );
@@ -112,18 +136,32 @@ router.patch(
       const token = await Database.updateToken(req.params.id, updates);
 
       if (!token) {
-        return res.status(404).json({ error: "Token not found" });
+        return res.status(404).json(
+          errorResponse({
+            code: "NOT_FOUND",
+            message: "Token not found",
+          })
+        );
       }
 
-      res.json({ token, message: "Token updated successfully" });
+      res.json(successResponse({ token, message: "Token updated successfully" }));
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res
-          .status(400)
-          .json({ error: "Invalid update data", details: error.errors });
+        return res.status(400).json(
+          errorResponse({
+            code: "VALIDATION_ERROR",
+            message: "Invalid update data",
+            details: error.errors,
+          })
+        );
       }
       console.error("Error updating token:", error);
-      res.status(500).json({ error: "Failed to update token" });
+      res.status(500).json(
+        errorResponse({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to update token",
+        })
+      );
     }
   }
 );
@@ -139,13 +177,23 @@ router.delete(
       const success = await Database.softDeleteToken(req.params.id);
 
       if (!success) {
-        return res.status(404).json({ error: "Token not found" });
+        return res.status(404).json(
+          errorResponse({
+            code: "NOT_FOUND",
+            message: "Token not found",
+          })
+        );
       }
 
-      res.json({ message: "Token deleted successfully" });
+      res.json(successResponse({ message: "Token deleted successfully" }));
     } catch (error) {
       console.error("Error deleting token:", error);
-      res.status(500).json({ error: "Failed to delete token" });
+      res.status(500).json(
+        errorResponse({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to delete token",
+        })
+      );
     }
   }
 );

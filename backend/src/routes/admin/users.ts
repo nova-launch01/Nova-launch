@@ -3,6 +3,7 @@ import { z } from "zod";
 import { Database } from "../../config/database";
 import { authenticateAdmin, requireSuperAdmin } from "../../middleware/auth";
 import { auditLog } from "../../middleware/auditLog";
+import { successResponse, errorResponse } from "../../utils/response";
 
 const router = Router();
 
@@ -45,18 +46,29 @@ router.get(
         );
       }
 
-      res.json({
-        users,
-        total: users.length,
-      });
+      res.json(
+        successResponse({
+          users,
+          total: users.length,
+        })
+      );
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res
-          .status(400)
-          .json({ error: "Invalid filters", details: error.errors });
+        return res.status(400).json(
+          errorResponse({
+            code: "VALIDATION_ERROR",
+            message: "Invalid filters",
+            details: error.errors,
+          })
+        );
       }
       console.error("Error fetching users:", error);
-      res.status(500).json({ error: "Failed to fetch users" });
+      res.status(500).json(
+        errorResponse({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to fetch users",
+        })
+      );
     }
   }
 );
@@ -71,7 +83,12 @@ router.get(
       const user = await Database.findUserById(req.params.id);
 
       if (!user) {
-        return res.status(404).json({ error: "User not found" });
+        return res.status(404).json(
+          errorResponse({
+            code: "NOT_FOUND",
+            message: "User not found",
+          })
+        );
       }
 
       // Get user's tokens
@@ -86,21 +103,28 @@ router.get(
           ? await Database.getAuditLogs({ adminId: user.id })
           : [];
 
-      res.json({
-        user,
-        tokens: userTokens,
-        activity: {
-          tokensCreated: userTokens.length,
-          totalBurned: userTokens
-            .reduce((sum, t) => sum + BigInt(t.burned || "0"), BigInt(0))
-            .toString(),
-          adminActions: auditLogs.length,
-        },
-        recentAuditLogs: auditLogs.slice(0, 10),
-      });
+      res.json(
+        successResponse({
+          user,
+          tokens: userTokens,
+          activity: {
+            tokensCreated: userTokens.length,
+            totalBurned: userTokens
+              .reduce((sum, t) => sum + BigInt(t.burned || "0"), BigInt(0))
+              .toString(),
+            adminActions: auditLogs.length,
+          },
+          recentAuditLogs: auditLogs.slice(0, 10),
+        })
+      );
     } catch (error) {
       console.error("Error fetching user:", error);
-      res.status(500).json({ error: "Failed to fetch user" });
+      res.status(500).json(
+        errorResponse({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to fetch user",
+        })
+      );
     }
   }
 );
@@ -118,18 +142,32 @@ router.patch(
       const user = await Database.updateUser(req.params.id, updates);
 
       if (!user) {
-        return res.status(404).json({ error: "User not found" });
+        return res.status(404).json(
+          errorResponse({
+            code: "NOT_FOUND",
+            message: "User not found",
+          })
+        );
       }
 
-      res.json({ user, message: "User updated successfully" });
+      res.json(successResponse({ user, message: "User updated successfully" }));
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res
-          .status(400)
-          .json({ error: "Invalid update data", details: error.errors });
+        return res.status(400).json(
+          errorResponse({
+            code: "VALIDATION_ERROR",
+            message: "Invalid update data",
+            details: error.errors,
+          })
+        );
       }
       console.error("Error updating user:", error);
-      res.status(500).json({ error: "Failed to update user" });
+      res.status(500).json(
+        errorResponse({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to update user",
+        })
+      );
     }
   }
 );
@@ -144,7 +182,12 @@ router.get(
       const user = await Database.findUserById(req.params.id);
 
       if (!user) {
-        return res.status(404).json({ error: "User not found" });
+        return res.status(404).json(
+          errorResponse({
+            code: "NOT_FOUND",
+            message: "User not found",
+          })
+        );
       }
 
       const allTokens = await Database.getAllTokens();
@@ -164,10 +207,15 @@ router.get(
         "Content-Disposition",
         `attachment; filename="user_${user.id}_export.json"`
       );
-      res.json(exportData);
+      res.json(successResponse(exportData));
     } catch (error) {
       console.error("Error exporting user data:", error);
-      res.status(500).json({ error: "Failed to export user data" });
+      res.status(500).json(
+        errorResponse({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to export user data",
+        })
+      );
     }
   }
 );

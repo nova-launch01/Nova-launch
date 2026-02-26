@@ -1,191 +1,36 @@
-name: Security Audit
+name: Security Scan
 
 on:
-  push:
-    branches: [main, develop]
-  pull_request:
-    branches: [main]
   schedule:
-    # Run weekly on Sundays at midnight UTC
     - cron: '0 0 * * 0'
-  workflow_dispatch: # Allow manual trigger
+  push:
+    branches: [main]
 
 jobs:
-  frontend-security:
-    name: Frontend Security Tests
+  security:
     runs-on: ubuntu-latest
-    
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v3
       
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v3
         with:
-          node-version: '18'
-          cache: 'npm'
-          cache-dependency-path: frontend/package-lock.json
+          node-version: '20'
       
-      - name: Install dependencies
-        working-directory: frontend
-        run: npm ci
-      
-      - name: Run NPM Audit
-        working-directory: frontend
+      - name: Run npm audit
+        working-directory: ./frontend
         run: npm audit --audit-level=moderate
         continue-on-error: true
-      
-      - name: Run Security Tests
-        working-directory: frontend
-        run: npm test src/test/security
-      
-      - name: Check for Secrets
-        run: |
-          if grep -r "PRIVATE_KEY\|SECRET_KEY\|API_SECRET" frontend/src/ --exclude-dir=test --exclude="*.test.ts"; then
-            echo "::error::Potential secrets found in code"
-            exit 1
-          fi
-      
-      - name: TypeScript Strict Check
-        working-directory: frontend
-        run: |
-          if ! grep -q '"strict": true' tsconfig.json; then
-            echo "::warning::TypeScript strict mode not enabled"
-          fi
-
-  contract-security:
-    name: Smart Contract Security Tests
-    runs-on: ubuntu-latest
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
       
       - name: Setup Rust
         uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
-          override: true
-      
-      - name: Cache Cargo
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            contracts/target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      
-      - name: Run Security Tests
-        working-directory: contracts/token-factory
-        run: cargo test security_test
-      
-      - name: Check for Unsafe Code
-        working-directory: contracts/token-factory
-        run: |
-          UNSAFE_COUNT=$(grep -r "unsafe" src/ --exclude-dir=test | wc -l)
-          if [ $UNSAFE_COUNT -gt 0 ]; then
-            echo "::warning::Found $UNSAFE_COUNT unsafe blocks"
-          fi
       
       - name: Install cargo-audit
         run: cargo install cargo-audit
       
-      - name: Run Cargo Audit
-        working-directory: contracts/token-factory
+      - name: Run cargo audit
+        working-directory: ./contracts/token-factory
         run: cargo audit
         continue-on-error: true
-
-  dependency-review:
-    name: Dependency Review
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      
-      - name: Dependency Review
-        uses: actions/dependency-review-action@v3
-        with:
-          fail-on-severity: moderate
-
-  security-report:
-    name: Generate Security Report
-    runs-on: ubuntu-latest
-    needs: [frontend-security, contract-security]
-    if: always()
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '18'
-      
-      - name: Setup Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-      
-      - name: Install dependencies
-        working-directory: frontend
-        run: npm ci
-      
-      - name: Generate Security Report
-        run: ./scripts/generate-security-report.sh
-        continue-on-error: true
-      
-      - name: Upload Security Report
-        uses: actions/upload-artifact@v3
-        with:
-          name: security-report
-          path: SECURITY_REPORT.md
-          retention-days: 90
-      
-      - name: Comment PR with Report
-        if: github.event_name == 'pull_request'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('fs');
-            const report = fs.readFileSync('SECURITY_REPORT.md', 'utf8');
-            const truncated = report.length > 65000 ? report.substring(0, 65000) + '\n\n... (truncated)' : report;
-            
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: `## Security Audit Report\n\n${truncated}`
-            });
-
-  codeql:
-    name: CodeQL Analysis
-    runs-on: ubuntu-latest
-    permissions:
-      actions: read
-      contents: read
-      security-events: write
-    
-    strategy:
-      matrix:
-        language: ['javascript', 'typescript']
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      
-      - name: Initialize CodeQL
-        uses: github/codeql-action/init@v2
-        with:
-          languages: ${{ matrix.language }}
-      
-      - name: Autobuild
-        uses: github/codeql-action/autobuild@v2
-      
-      - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v2

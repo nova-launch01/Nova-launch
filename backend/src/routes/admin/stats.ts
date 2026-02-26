@@ -3,6 +3,7 @@ import { Database } from "../../config/database";
 import { AdminStats } from "../../types";
 import { authenticateAdmin } from "../../middleware/auth";
 import { auditLog } from "../../middleware/auditLog";
+import { successResponse, errorResponse } from "../../utils/response";
 
 const router = Router();
 
@@ -88,10 +89,15 @@ router.get(
         },
       };
 
-      res.json(stats);
+      res.json(successResponse(stats));
     } catch (error) {
       console.error("Error fetching stats:", error);
-      res.status(500).json({ error: "Failed to fetch statistics" });
+      res.status(500).json(
+        errorResponse({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to fetch statistics",
+        })
+      );
     }
   }
 );

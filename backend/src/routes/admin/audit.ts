@@ -2,6 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { Database } from "../../config/database";
 import { authenticateAdmin } from "../../middleware/auth";
+import { successResponse, errorResponse } from "../../utils/response";
 
 const router = Router();
 
@@ -36,23 +37,34 @@ router.get("/", authenticateAdmin, async (req, res) => {
     const total = logs.length;
     logs = logs.slice(offset, offset + limit);
 
-    res.json({
-      logs,
-      pagination: {
-        total,
-        limit,
-        offset,
-        hasMore: offset + limit < total,
-      },
-    });
+    res.json(
+      successResponse({
+        logs,
+        pagination: {
+          total,
+          limit,
+          offset,
+          hasMore: offset + limit < total,
+        },
+      })
+    );
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return res
-        .status(400)
-        .json({ error: "Invalid filters", details: error.errors });
+      return res.status(400).json(
+        errorResponse({
+          code: "VALIDATION_ERROR",
+          message: "Invalid filters",
+          details: error.errors,
+        })
+      );
     }
     console.error("Error fetching audit logs:", error);
-    res.status(500).json({ error: "Failed to fetch audit logs" });
+    res.status(500).json(
+      errorResponse({
+        code: "INTERNAL_SERVER_ERROR",
+        message: "Failed to fetch audit logs",
+      })
+    );
   }
 });
 
@@ -82,10 +94,15 @@ router.get("/export", authenticateAdmin, async (req, res) => {
       "Content-Disposition",
       `attachment; filename="audit_logs_${Date.now()}.json"`
     );
-    res.json(exportData);
+    res.json(successResponse(exportData));
   } catch (error) {
     console.error("Error exporting audit logs:", error);
-    res.status(500).json({ error: "Failed to export audit logs" });
+    res.status(500).json(
+      errorResponse({
+        code: "INTERNAL_SERVER_ERROR",
+        message: "Failed to export audit logs",
+      })
+    );
   }
 });
 

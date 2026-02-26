@@ -7,6 +7,7 @@ import {
   getMostBurnersLeaderboard,
   TimePeriod,
 } from "../services/leaderboardService";
+import { successResponse, errorResponse } from "../utils/response";
 
 const router = Router();
 
@@ -46,13 +47,15 @@ router.get("/most-burned", async (req: Request, res: Response) => {
     );
 
     const result = await getMostBurnedLeaderboard(period, page, limit);
-    res.json(result);
+    res.json(successResponse(result));
   } catch (error) {
     console.error("Error fetching most-burned leaderboard:", error);
-    res.status(500).json({
-      success: false,
-      error: "Failed to fetch leaderboard",
-    });
+    res.status(500).json(
+      errorResponse({
+        code: "INTERNAL_SERVER_ERROR",
+        message: "Failed to fetch leaderboard",
+      })
+    );
   }
 });
 
@@ -69,13 +72,15 @@ router.get("/most-active", async (req: Request, res: Response) => {
     );
 
     const result = await getMostActiveLeaderboard(period, page, limit);
-    res.json(result);
+    res.json(successResponse(result));
   } catch (error) {
     console.error("Error fetching most-active leaderboard:", error);
-    res.status(500).json({
-      success: false,
-      error: "Failed to fetch leaderboard",
-    });
+    res.status(500).json(
+      errorResponse({
+        code: "INTERNAL_SERVER_ERROR",
+        message: "Failed to fetch leaderboard",
+      })
+    );
   }
 });
 
@@ -91,13 +96,15 @@ router.get("/newest", async (req: Request, res: Response) => {
     );
 
     const result = await getNewestTokensLeaderboard(page, limit);
-    res.json(result);
+    res.json(successResponse(result));
   } catch (error) {
     console.error("Error fetching newest leaderboard:", error);
-    res.status(500).json({
-      success: false,
-      error: "Failed to fetch leaderboard",
-    });
+    res.status(500).json(
+      errorResponse({
+        code: "INTERNAL_SERVER_ERROR",
+        message: "Failed to fetch leaderboard",
+      })
+    );
   }
 });
 
@@ -113,13 +120,15 @@ router.get("/largest-supply", async (req: Request, res: Response) => {
     );
 
     const result = await getLargestSupplyLeaderboard(page, limit);
-    res.json(result);
+    res.json(successResponse(result));
   } catch (error) {
     console.error("Error fetching largest-supply leaderboard:", error);
-    res.status(500).json({
-      success: false,
-      error: "Failed to fetch leaderboard",
-    });
+    res.status(500).json(
+      errorResponse({
+        code: "INTERNAL_SERVER_ERROR",
+        message: "Failed to fetch leaderboard",
+      })
+    );
   }
 });
 
@@ -136,13 +145,15 @@ router.get("/most-burners", async (req: Request, res: Response) => {
     );
 
     const result = await getMostBurnersLeaderboard(period, page, limit);
-    res.json(result);
+    res.json(successResponse(result));
   } catch (error) {
     console.error("Error fetching most-burners leaderboard:", error);
-    res.status(500).json({
-      success: false,
-      error: "Failed to fetch leaderboard",
-    });
+    res.status(500).json(
+      errorResponse({
+        code: "INTERNAL_SERVER_ERROR",
+        message: "Failed to fetch leaderboard",
+      })
+    );
   }
 });
 
