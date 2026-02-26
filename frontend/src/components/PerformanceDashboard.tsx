@@ -1,76 +1,25 @@
 import { useEffect, useState } from 'react';
+import { getPerformanceMetrics, generatePerformanceReport, type PerformanceMetrics } from '../utils/performance';
 
 /**
  * Performance Dashboard Component
- * 
- * Displays real-time performance metrics and historical trends.
- * This is an optional component for monitoring performance in development.
+ * Displays real-time performance metrics for debugging
+ * Only shown in development mode
  */
-
-interface PerformanceMetrics {
-  fcp: number;
-  lcp: number;
-  cls: number;
-  fid: number;
-  ttfb: number;
-  memory?: {
-    used: number;
-    total: number;
-    limit: number;
-  };
-}
-
-interface PerformanceEntry {
-  name: string;
-  value: number;
-  rating: 'good' | 'needs-improvement' | 'poor';
-  unit: string;
-}
-
 export function PerformanceDashboard() {
-  const [metrics, setMetrics] = useState<PerformanceMetrics | null>(null);
+  const [metrics, setMetrics] = useState<PerformanceMetrics>({});
   const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
     // Only show in development
     if (import.meta.env.PROD) return;
 
-    // Collect performance metrics
-    const collectMetrics = () => {
-      const navigation = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming;
-      const paint = performance.getEntriesByType('paint');
-      
-      const fcp = paint.find(entry => entry.name === 'first-contentful-paint')?.startTime || 0;
-      
-      const newMetrics: PerformanceMetrics = {
-        fcp,
-        lcp: 0, // Would need PerformanceObserver for real LCP
-        cls: 0, // Would need PerformanceObserver for real CLS
-        fid: 0, // Would need PerformanceObserver for real FID
-        ttfb: navigation?.responseStart - navigation?.requestStart || 0,
-      };
+    // Update metrics every 2 seconds
+    const interval = setInterval(() => {
+      setMetrics(getPerformanceMetrics());
+    }, 2000);
 
-      // Add memory info if available
-      if ('memory' in performance) {
-        const memory = (performance as any).memory;
-        newMetrics.memory = {
-          used: memory.usedJSHeapSize / 1048576, // Convert to MB
-          total: memory.totalJSHeapSize / 1048576,
-          limit: memory.jsHeapSizeLimit / 1048576,
-        };
-      }
-
-      setMetrics(newMetrics);
-    };
-
-    // Collect metrics after page load
-    if (document.readyState === 'complete') {
-      collectMetrics();
-    } else {
-      window.addEventListener('load', collectMetrics);
-    }
-
-    // Keyboard shortcut to toggle dashboard (Ctrl+Shift+P)
+    // Listen for keyboard shortcut (Ctrl+Shift+P)
     const handleKeyPress = (e: KeyboardEvent) => {
       if (e.ctrlKey && e.shiftKey && e.key === 'P') {
         setIsVisible(prev => !prev);
@@ -80,89 +29,123 @@ export function PerformanceDashboard() {
     window.addEventListener('keydown', handleKeyPress);
 
     return () => {
-      window.removeEventListener('load', collectMetrics);
+      clearInterval(interval);
       window.removeEventListener('keydown', handleKeyPress);
     };
   }, []);
 
-  if (!isVisible || !metrics) return null;
+  if (!isVisible || import.meta.env.PROD) return null;
 
-  const entries: PerformanceEntry[] = [
-    {
-      name: 'First Contentful Paint',
-      value: metrics.fcp,
-      rating: metrics.fcp < 1500 ? 'good' : metrics.fcp < 2500 ? 'needs-improvement' : 'poor',
-      unit: 'ms',
-    },
-    {
-      name: 'Time to First Byte',
-      value: metrics.ttfb,
-      rating: metrics.ttfb < 800 ? 'good' : metrics.ttfb < 1800 ? 'needs-improvement' : 'poor',
-      unit: 'ms',
-    },
-  ];
+  const formatMetric = (value: number | undefined, unit: string = 'ms'): string => {
+    if (value === undefined) return 'N/A';
+    return unit === 'ms' ? `${value.toFixed(0)}${unit}` : value.toFixed(3);
+  };
 
-  const getRatingColor = (rating: string) => {
-    switch (rating) {
-      case 'good':
-        return 'text-green-600';
-      case 'needs-improvement':
-        return 'text-yellow-600';
-      case 'poor':
-        return 'text-red-600';
-      default:
-        return 'text-gray-600';
-    }
+  const getMetricColor = (metric: string, value: number | undefined): string => {
+    if (value === undefined) return 'text-gray-400';
+
+    const thresholds: Record<string, { good: number; poor: number }> = {
+      FCP: { good: 1500, poor: 2500 },
+      LCP: { good: 2500, poor: 4000 },
+      FID: { good: 100, poor: 300 },
+      CLS: { good: 0.1, poor: 0.25 },
+      TTFB: { good: 600, poor: 1500 },
+    };
+
+    const threshold = thresholds[metric];
+    if (!threshold) return 'text-gray-300';
+
+    if (value <= threshold.good) return 'text-green-400';
+    if (value <= threshold.poor) return 'text-yellow-400';
+    return 'text-red-400';
+  };
+
+  const downloadReport = () => {
+    const report = generatePerformanceReport();
+    const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `performance-report-${Date.now()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   return (
-    <div className="fixed bottom-4 right-4 bg-white dark:bg-gray-800 shadow-lg rounded-lg p-4 max-w-md z-50 border border-gray-200 dark:border-gray-700">
+    <div className="fixed bottom-4 right-4 bg-gray-900 text-white p-4 rounded-lg shadow-2xl border border-gray-700 max-w-md z-50">
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
-          Performance Metrics
-        </h3>
-        <button
-          onClick={() => setIsVisible(false)}
-          className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-          aria-label="Close performance dashboard"
-        >
-          ✕
-        </button>
+        <h3 className="text-sm font-bold">⚡ Performance Metrics</h3>
+        <div className="flex gap-2">
+          <button
+            onClick={downloadReport}
+            className="text-xs px-2 py-1 bg-blue-600 hover:bg-blue-700 rounded"
+            title="Download Report"
+          >
+            📥
+          </button>
+          <button
+            onClick={() => setIsVisible(false)}
+            className="text-xs px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded"
+          >
+            ✕
+          </button>
+        </div>
       </div>
 
-      <div className="space-y-2">
-        {entries.map(entry => (
-          <div key={entry.name} className="flex items-center justify-between text-sm">
-            <span className="text-gray-600 dark:text-gray-400">{entry.name}</span>
-            <span className={`font-mono font-semibold ${getRatingColor(entry.rating)}`}>
-              {entry.value.toFixed(0)}{entry.unit}
+      <div className="space-y-2 text-xs">
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <span className="text-gray-400">FCP:</span>
+            <span className={`ml-2 font-mono ${getMetricColor('FCP', metrics.FCP)}`}>
+              {formatMetric(metrics.FCP)}
             </span>
           </div>
-        ))}
-
-        {metrics.memory && (
-          <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
-            <div className="text-sm text-gray-600 dark:text-gray-400 mb-1">
-              Memory Usage
-            </div>
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-gray-600 dark:text-gray-400">Used / Total</span>
-              <span className="font-mono font-semibold text-gray-900 dark:text-white">
-                {metrics.memory.used.toFixed(1)} / {metrics.memory.total.toFixed(1)} MB
-              </span>
-            </div>
-            <div className="mt-1 w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-              <div
-                className="bg-blue-600 h-2 rounded-full transition-all"
-                style={{ width: `${(metrics.memory.used / metrics.memory.total) * 100}%` }}
-              />
-            </div>
+          <div>
+            <span className="text-gray-400">LCP:</span>
+            <span className={`ml-2 font-mono ${getMetricColor('LCP', metrics.LCP)}`}>
+              {formatMetric(metrics.LCP)}
+            </span>
           </div>
-        )}
-      </div>
+          <div>
+            <span className="text-gray-400">FID:</span>
+            <span className={`ml-2 font-mono ${getMetricColor('FID', metrics.FID)}`}>
+              {formatMetric(metrics.FID)}
+            </span>
+          </div>
+          <div>
+            <span className="text-gray-400">CLS:</span>
+            <span className={`ml-2 font-mono ${getMetricColor('CLS', metrics.CLS)}`}>
+              {formatMetric(metrics.CLS, '')}
+            </span>
+          </div>
+          <div>
+            <span className="text-gray-400">TTFB:</span>
+            <span className={`ml-2 font-mono ${getMetricColor('TTFB', metrics.TTFB)}`}>
+              {formatMetric(metrics.TTFB)}
+            </span>
+          </div>
+          <div>
+            <span className="text-gray-400">TTI:</span>
+            <span className={`ml-2 font-mono ${getMetricColor('TTI', metrics.TTI)}`}>
+              {formatMetric(metrics.TTI)}
+            </span>
+          </div>
+        </div>
 
-      <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700 text-xs text-gray-500 dark:text-gray-400">
-        Press Ctrl+Shift+P to toggle • Dev only
+        <div className="pt-2 border-t border-gray-700 text-gray-400">
+          <div className="flex items-center gap-2">
+            <span className="w-3 h-3 bg-green-400 rounded-full"></span>
+            <span>Good</span>
+            <span className="w-3 h-3 bg-yellow-400 rounded-full ml-2"></span>
+            <span>Needs Improvement</span>
+            <span className="w-3 h-3 bg-red-400 rounded-full ml-2"></span>
+            <span>Poor</span>
+          </div>
+        </div>
+
+        <div className="pt-2 text-gray-500 text-[10px]">
+          Press Ctrl+Shift+P to toggle
+        </div>
       </div>
     </div>
   );

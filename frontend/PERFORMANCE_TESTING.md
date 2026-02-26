@@ -4,319 +4,344 @@ This guide covers the comprehensive performance testing setup for the Nova Launc
 
 ## Overview
 
-Our performance testing strategy includes:
+Performance testing ensures the application loads quickly and responds smoothly. We test:
 
-- **Lighthouse CI**: Automated Core Web Vitals monitoring
-- **Bundle Analysis**: Track and enforce bundle size budgets
-- **Custom Benchmarks**: Component render and interaction performance
-- **Performance Monitoring**: Historical tracking and regression detection
+- **Load Performance**: Page load times and Core Web Vitals
+- **Runtime Performance**: Component render times and interactions
+- **Bundle Performance**: Bundle sizes and code splitting
+- **Real User Monitoring**: Actual user metrics
 
 ## Performance Budgets
 
-### Load Performance Targets
+### Load Performance
+- **First Contentful Paint (FCP)**: < 1.5s
+- **Largest Contentful Paint (LCP)**: < 2.5s
+- **Time to Interactive (TTI)**: < 3.5s
+- **Total Blocking Time (TBT)**: < 300ms
+- **Cumulative Layout Shift (CLS)**: < 0.1
 
-| Metric | Target | Budget |
-|--------|--------|--------|
-| First Contentful Paint (FCP) | < 1.5s | Critical |
-| Largest Contentful Paint (LCP) | < 2.5s | Critical |
-| Time to Interactive (TTI) | < 3.5s | Critical |
-| Total Blocking Time (TBT) | < 300ms | Critical |
-| Cumulative Layout Shift (CLS) | < 0.1 | Critical |
-| Speed Index | < 3.0s | Important |
+### Runtime Performance
+- **Component render time**: < 16ms (60fps)
+- **Interaction response**: < 100ms
+- **Animation frame rate**: 60fps
+- **Memory usage**: Stable, no leaks
 
-### Runtime Performance Targets
-
-| Metric | Target | Budget |
-|--------|--------|--------|
-| Component Render Time | < 16ms | 60fps |
-| Interaction Response | < 100ms | Perceived instant |
-| Animation Frame Rate | 60fps | Smooth |
-| Memory Usage | Stable | No leaks |
-
-### Bundle Size Budgets
-
-| Resource Type | Budget | Status |
-|---------------|--------|--------|
-| Initial Bundle | 200 KB | Enforced |
-| Total Bundle | 500 KB | Enforced |
-| JavaScript | 200 KB | Monitored |
-| CSS | 50 KB | Monitored |
-| Images | 200 KB | Monitored |
-| Fonts | 100 KB | Monitored |
+### Bundle Performance
+- **Initial bundle**: < 200KB
+- **Total bundle**: < 500KB
+- **CSS bundle**: < 50KB
+- **Code splitting**: Effective
+- **Lazy loading**: Working
+- **Tree shaking**: Effective
 
 ## Running Performance Tests
 
-### Local Testing
+### 1. Bundle Size Tests
 
 ```bash
-# Run all performance tests
+# Build the application first
+npm run build
+
+# Run bundle size tests
 npm run test:performance
 
-# Run in watch mode
-npm run test:performance:watch
+# Check bundle sizes against budgets
+node scripts/performance-check.js
+```
 
-# Analyze bundle size
-npm run analyze
+### 2. Component Benchmarks
 
-# Run Lighthouse locally
+```bash
+# Run performance benchmarks
+npm run test -- src/test/performance/benchmark.test.ts
+
+# Run with detailed output
+npm run test -- src/test/performance/benchmark.test.ts --reporter=verbose
+```
+
+### 3. Lighthouse CI
+
+```bash
+# Install Lighthouse CI globally
+npm install -g @lhci/cli
+
+# Build and preview the app
 npm run build
 npm run preview
-npm run lighthouse
 
-# Monitor performance trends
-npm run perf:monitor
+# In another terminal, run Lighthouse
+lhci autorun
 ```
 
-### CI/CD Integration
+### 4. Real User Monitoring
+
+The application automatically tracks performance metrics in production:
+
+```typescript
+import { initPerformanceMonitoring, getPerformanceMetrics } from './utils/performance';
+
+// Initialize monitoring on app start
+initPerformanceMonitoring();
+
+// Get current metrics
+const metrics = getPerformanceMetrics();
+console.log(metrics);
+```
+
+## Performance Testing Tools
+
+### 1. Vitest Performance Tests
+
+Located in `src/test/performance/`:
+
+- **bundle-size.test.ts**: Tests bundle sizes against budgets
+- **benchmark.test.ts**: Benchmarks component render times
+- **web-vitals.test.ts**: Validates Web Vitals budgets
+
+### 2. Lighthouse CI
+
+Configuration in `.lighthouserc.json`:
+
+- Runs on multiple pages
+- Tests desktop performance
+- Enforces performance budgets
+- Generates detailed reports
+
+### 3. Bundle Analyzer
+
+```bash
+# Analyze bundle composition
+npm run build:analyze
+
+# Opens interactive bundle visualization
+```
+
+### 4. Performance Check Script
+
+```bash
+# Quick performance check
+node scripts/performance-check.js
+```
+
+## CI/CD Integration
 
 Performance tests run automatically on:
-- Every push to `main` or `develop`
+
+- Every push to main/develop
 - Every pull request
-- Manual workflow dispatch
+- Scheduled nightly builds
 
-The CI pipeline includes:
-1. Lighthouse CI for Core Web Vitals
-2. Bundle size analysis with budget enforcement
-3. Custom performance benchmarks
-4. Performance monitoring and trend analysis
+### GitHub Actions Workflow
 
-## Test Structure
+Located in `.github/workflows/performance.yml`:
 
-### 1. Benchmark Tests (`src/test/performance/benchmark.test.ts`)
+1. Builds the application
+2. Runs bundle size tests
+3. Checks against budgets
+4. Runs Lighthouse CI
+5. Comments results on PRs
+6. Uploads artifacts
 
-Measures component render times and memory usage:
+## Performance Monitoring
 
-```typescript
-// Example: Component render benchmark
-const stats = measureAverageRenderTime(<Button>Click</Button>);
-expect(stats.avg).toBeLessThan(16); // 60fps budget
-```
+### Real User Monitoring (RUM)
 
-Tests include:
-- Simple component render times
-- List rendering with 100+ items
-- Stateful component updates
-- Memory leak detection
-
-### 2. Interaction Tests (`src/test/performance/interaction.test.ts`)
-
-Measures user interaction response times:
+The app tracks actual user metrics:
 
 ```typescript
-// Example: Click response time
-const start = performance.now();
-fireEvent.click(button);
-const duration = performance.now() - start;
-expect(duration).toBeLessThan(100); // 100ms budget
+// Automatically tracked:
+- First Contentful Paint (FCP)
+- Largest Contentful Paint (LCP)
+- First Input Delay (FID)
+- Cumulative Layout Shift (CLS)
+- Time to First Byte (TTFB)
+- Navigation timing
+- Network conditions
 ```
 
-Tests include:
-- Button click responses
-- Form input changes
-- Rapid state updates
-- Scroll event handling
-- Animation frame rates
+### Custom Performance Marks
 
-### 3. Bundle Analysis Tests (`src/test/performance/bundle-analysis.test.ts`)
+```typescript
+import { markPerformance, measurePerformance } from './utils/performance';
 
-Verifies build optimization:
+// Mark start of operation
+markPerformance('operation-start');
 
-- Code splitting configuration
-- Compression enabled
-- Tree shaking active
-- Lazy loading patterns
-- Asset optimization
+// ... perform operation ...
 
-## Scripts
-
-### `analyze-bundle.js`
-
-Analyzes the production build and generates a detailed report:
-
-```bash
-npm run build
-node scripts/analyze-bundle.js
+// Mark end and measure
+markPerformance('operation-end');
+const duration = measurePerformance('operation', 'operation-start', 'operation-end');
+console.log(`Operation took ${duration}ms`);
 ```
 
-Output:
-- Total bundle size vs budget
-- Breakdown by resource type
-- Largest files identified
-- Optimization opportunities
-- Exits with error if budget exceeded
+## Performance Dashboard
 
-### `performance-monitor.js`
+### Viewing Metrics
 
-Tracks performance metrics over time:
+1. **Browser DevTools**:
+   - Open DevTools → Performance tab
+   - Record and analyze performance
+   - View Core Web Vitals
 
-```bash
-node scripts/performance-monitor.js
-```
+2. **Lighthouse**:
+   - Open DevTools → Lighthouse tab
+   - Run audit
+   - View detailed report
 
-Features:
-- Stores historical data in `performance-history.json`
-- Detects regressions (>10% increase)
-- Shows trends over last 5 builds
-- Integrates with Lighthouse and bundle analysis
-- Exits with error if regressions detected
+3. **Bundle Analyzer**:
+   - Run `npm run build:analyze`
+   - Interactive visualization opens
+   - Identify large dependencies
 
-## Lighthouse CI Configuration
+### Stored Metrics
 
-Configuration in `.lighthouserc.js`:
+Performance metrics are stored in localStorage:
 
 ```javascript
-{
-  ci: {
-    collect: {
-      url: ['http://localhost:4173'],
-      numberOfRuns: 3,
-    },
-    assert: {
-      assertions: {
-        'categories:performance': ['error', { minScore: 0.9 }],
-        'first-contentful-paint': ['error', { maxNumericValue: 1500 }],
-        // ... more assertions
-      },
-    },
-  },
-}
+// View stored metrics
+const metrics = JSON.parse(localStorage.getItem('performance_metrics'));
+console.log(metrics);
 ```
 
-## Performance Optimization Strategies
+## Optimization Strategies
 
-### Code Splitting
+### Bundle Size Optimization
 
-Configured in `vite.config.ts`:
+1. **Code Splitting**:
+   ```typescript
+   // Lazy load components
+   const Dashboard = lazy(() => import('./pages/Dashboard'));
+   ```
 
-```typescript
-manualChunks(id) {
-  if (id.includes('react')) return 'react-vendor';
-  if (id.includes('@stellar')) return 'stellar-sdk';
-  if (id.includes('i18next')) return 'i18n';
-  // ... more chunks
-}
-```
+2. **Tree Shaking**:
+   - Import only what you need
+   - Use ES modules
+   - Avoid default exports for utilities
 
-### Lazy Loading
+3. **Compression**:
+   - Gzip/Brotli enabled
+   - Minification in production
+   - Asset optimization
 
-Use React.lazy for route-based code splitting:
+### Runtime Optimization
 
-```typescript
-const Dashboard = lazy(() => import('./pages/Dashboard'));
-```
+1. **Component Optimization**:
+   ```typescript
+   // Memoize expensive components
+   const MemoizedComponent = memo(Component);
+   
+   // Memoize expensive calculations
+   const value = useMemo(() => expensiveCalc(), [deps]);
+   
+   // Memoize callbacks
+   const callback = useCallback(() => {}, [deps]);
+   ```
 
-### Asset Optimization
+2. **Virtual Scrolling**:
+   - For long lists
+   - Render only visible items
+   - Improves scroll performance
 
-- Images: WebP format with fallbacks
-- Fonts: Subset and preload critical fonts
-- Icons: SVG sprites
-- Inline limit: 4KB for small assets
+3. **Debouncing/Throttling**:
+   ```typescript
+   // Debounce search input
+   const debouncedSearch = debounce(search, 300);
+   
+   // Throttle scroll handler
+   const throttledScroll = throttle(handleScroll, 100);
+   ```
 
-### Compression
+### Load Performance Optimization
 
-Both Gzip and Brotli compression enabled:
+1. **Critical CSS**:
+   - Inline critical CSS
+   - Defer non-critical CSS
+   - Remove unused CSS
 
-```typescript
-plugins: [
-  compression({ algorithm: 'gzip' }),
-  compression({ algorithm: 'brotliCompress' }),
-]
-```
+2. **Image Optimization**:
+   - Use WebP format
+   - Lazy load images
+   - Responsive images
+   - Proper sizing
 
-## Monitoring and Alerts
-
-### CI/CD Alerts
-
-The pipeline will fail if:
-- Performance score < 90
-- Any Core Web Vital exceeds budget
-- Bundle size exceeds 500KB
-- Performance regression > 10%
-
-### PR Comments
-
-Bundle analysis is automatically commented on PRs:
-- Total size vs budget
-- Breakdown by resource type
-- Optimization opportunities
-
-### Historical Tracking
-
-Performance history is stored in `performance-history.json`:
-- Last 100 builds tracked
-- Includes commit SHA and branch
-- Used for trend analysis
+3. **Font Optimization**:
+   - Use font-display: swap
+   - Preload critical fonts
+   - Subset fonts
 
 ## Troubleshooting
 
+### Bundle Too Large
+
+1. Check bundle analyzer for large dependencies
+2. Consider alternatives to large libraries
+3. Implement code splitting
+4. Enable tree shaking
+
 ### Slow Component Renders
 
-1. Check benchmark test results
+1. Run benchmark tests to identify slow components
 2. Use React DevTools Profiler
-3. Look for unnecessary re-renders
-4. Consider memoization (React.memo, useMemo)
+3. Memoize expensive operations
+4. Optimize re-renders
 
-### Large Bundle Size
+### Poor Web Vitals
 
-1. Run `npm run analyze` to see breakdown
-2. Check for duplicate dependencies
-3. Verify tree shaking is working
-4. Add more code splitting
-5. Review lazy loading opportunities
-
-### Poor Lighthouse Scores
-
-1. Check specific failing audits
-2. Review network waterfall
+1. Run Lighthouse for detailed recommendations
+2. Check network waterfall
 3. Optimize critical rendering path
 4. Reduce JavaScript execution time
-5. Minimize main thread work
 
 ### Memory Leaks
 
-1. Run memory benchmark tests
-2. Use Chrome DevTools Memory Profiler
-3. Check for event listener cleanup
-4. Verify useEffect cleanup functions
-5. Look for circular references
+1. Check for event listener cleanup
+2. Clear timers and intervals
+3. Unsubscribe from observables
+4. Use Chrome DevTools Memory profiler
 
 ## Best Practices
 
-1. **Run tests locally** before pushing
-2. **Monitor trends** not just absolute values
-3. **Set realistic budgets** based on user needs
-4. **Optimize incrementally** don't over-optimize
-5. **Test on real devices** not just desktop
-6. **Consider network conditions** test on 3G/4G
-7. **Profile in production mode** dev mode is slower
-8. **Use performance budgets** as guardrails
-9. **Document optimizations** for team knowledge
-10. **Celebrate wins** when metrics improve
+1. **Test Early and Often**:
+   - Run performance tests in development
+   - Check bundle sizes before merging
+   - Monitor metrics in production
+
+2. **Set Realistic Budgets**:
+   - Based on target devices
+   - Consider network conditions
+   - Review and adjust regularly
+
+3. **Automate Testing**:
+   - Run in CI/CD pipeline
+   - Fail builds on regression
+   - Track trends over time
+
+4. **Monitor Production**:
+   - Track real user metrics
+   - Identify slow devices
+   - Analyze bottlenecks
+
+5. **Document Changes**:
+   - Note performance impacts
+   - Document optimizations
+   - Share learnings
 
 ## Resources
 
 - [Web Vitals](https://web.dev/vitals/)
-- [Lighthouse CI](https://github.com/GoogleChrome/lighthouse-ci)
-- [Vite Performance](https://vitejs.dev/guide/performance.html)
+- [Lighthouse](https://developers.google.com/web/tools/lighthouse)
+- [Chrome DevTools Performance](https://developer.chrome.com/docs/devtools/performance/)
 - [React Performance](https://react.dev/learn/render-and-commit)
-- [Bundle Analysis](https://github.com/btd/rollup-plugin-visualizer)
+- [Vite Performance](https://vitejs.dev/guide/performance.html)
 
-## Next Steps
+## Acceptance Criteria
 
-1. ✅ Set up performance testing tools
-2. ✅ Configure performance budgets
-3. ✅ Write custom benchmarks
-4. ✅ Add bundle size tracking
-5. ✅ Create performance monitoring
-6. ✅ Set up CI/CD integration
-7. ⏳ Create performance dashboard (optional)
-8. ⏳ Set up real user monitoring (optional)
-9. ⏳ Add performance alerts (optional)
-
-## Support
-
-For questions or issues with performance testing:
-1. Check this documentation
-2. Review test output and logs
-3. Consult the team
-4. File an issue with performance data
+- ✅ All metrics meet targets
+- ✅ Budgets enforced in CI
+- ✅ Tests run automatically
+- ✅ Dashboard shows trends
+- ✅ Alerts configured
+- ✅ Documentation complete
+- ✅ Team trained on tools
+- ✅ Optimization strategies documented

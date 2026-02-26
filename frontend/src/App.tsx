@@ -3,6 +3,8 @@ import { useNetwork } from "./hooks/useNetwork";
 import { useWallet } from "./hooks/useWallet";
 import { Spinner, ErrorBoundary } from "./components/UI";
 import { DashboardLayout } from "./components/Layout";
+import { PerformanceDashboard } from "./components/PerformanceDashboard";
+import { PWAUpdateNotification } from "./components/PWA";
 
 // Lazy load pages
 const LandingPage = lazy(() => import("./pages/LandingPage"));
@@ -117,6 +119,12 @@ function App() {
           {page}
         </div>
       </Suspense>
+
+      {/* PWA Update Notification */}
+      <PWAUpdateNotification />
+
+      {/* Performance Dashboard (Dev only) */}
+      <PerformanceDashboard />
     </ErrorBoundary>
   );
 }

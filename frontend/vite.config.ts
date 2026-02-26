@@ -9,26 +9,31 @@ import { visualizer } from 'rollup-plugin-visualizer'
 export default defineConfig({
   plugins: [
     react(),
+    // Gzip compression
     compression({
       algorithm: 'gzip',
       ext: '.gz',
     }),
+    // Brotli compression
     compression({
       algorithm: 'brotliCompress',
       ext: '.br',
     }),
-    process.env.ANALYZE && visualizer({
+    // Bundle analyzer (only when ANALYZE=true)
+    process.env.ANALYZE === 'true' && visualizer({
       open: true,
       filename: 'dist/stats.html',
       gzipSize: true,
       brotliSize: true,
     }),
   ].filter(Boolean),
+  
   build: {
     target: 'es2020',
     cssCodeSplit: true,
     reportCompressedSize: true,
     assetsInlineLimit: 4096,
+    
     rollupOptions: {
       output: {
         manualChunks(id) {
@@ -42,6 +47,9 @@ export default defineConfig({
             if (id.includes('i18next')) {
               return 'i18n'
             }
+            if (id.includes('recharts')) {
+              return 'charts'
+            }
             return 'vendor'
           }
           if (id.includes('landing/Features') || 
@@ -52,7 +60,16 @@ export default defineConfig({
         },
       },
     },
+    
+    minify: 'terser',
+    terserOptions: {
+      compress: {
+        drop_console: true,
+        drop_debugger: true,
+      },
+    },
   },
+  
   optimizeDeps: {
     include: ['react', 'react-dom'],
   },
