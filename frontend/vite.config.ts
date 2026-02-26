@@ -7,7 +7,23 @@ import { visualizer } from 'rollup-plugin-visualizer'
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    compression({
+      algorithm: 'gzip',
+      ext: '.gz',
+    }),
+    compression({
+      algorithm: 'brotliCompress',
+      ext: '.br',
+    }),
+    process.env.ANALYZE && visualizer({
+      open: true,
+      filename: 'dist/stats.html',
+      gzipSize: true,
+      brotliSize: true,
+    }),
+  ].filter(Boolean),
   build: {
     target: 'es2020',
     cssCodeSplit: true,
