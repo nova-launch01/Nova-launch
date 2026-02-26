@@ -364,4 +364,143 @@ describe('useTokenDeploy', () => {
             });
         });
     });
+
+    describe('retry', () => {
+        it('retries failed deployment', async () => {
+            let callCount = 0;
+            vi.mocked(StellarService.prototype.deployToken).mockImplementation(() => {
+                callCount++;
+                if (callCount === 1) {
+                    return Promise.reject(new Error('Transaction failed'));
+                }
+                return Promise.resolve({
+                    tokenAddress: 'CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC',
+                    transactionHash: 'abc123',
+                    timestamp: Date.now(),
+                });
+            });
+
+            const { result } = renderHook(() => useTokenDeploy('testnet', { retryDelay: 0 }));
+
+            const params = {
+                name: 'Test Token',
+                symbol: 'TST',
+                decimals: 7,
+                initialSupply: '1000000',
+                adminWallet: 'GABCDEF1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF12',
+            };
+
+            // First attempt fails
+            await act(async () => {
+                await expect(result.current.deploy(params)).rejects.toThrow();
+            });
+
+            expect(result.current.status).toBe('error');
+            expect(result.current.canRetry).toBe(true);
+            expect(result.current.retryCount).toBe(0);
+
+            // Retry succeeds
+            await act(async () => {
+                await result.current.retry();
+            });
+
+            expect(result.current.status).toBe('success');
+            expect(result.current.retryCount).toBe(1);
+        });
+
+        it('respects maxRetries limit', async () => {
+            vi.mocked(StellarService.prototype.deployToken).mockRejectedValue(
+                new Error('Transaction failed')
+            );
+
+            const { result } = renderHook(() => useTokenDeploy('testnet', { maxRetries: 2, retryDelay: 0 }));
+
+            const params = {
+                name: 'Test Token',
+                symbol: 'TST',
+                decimals: 7,
+                initialSupply: '1000000',
+                adminWallet: 'GABCDEF1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF12',
+            };
+
+            // First attempt
+            await act(async () => {
+                await expect(result.current.deploy(params)).rejects.toThrow();
+            });
+
+            // Retry 1
+            await act(async () => {
+                await expect(result.current.retry()).rejects.toThrow();
+            });
+            expect(result.current.retryCount).toBe(1);
+
+            // Retry 2
+            await act(async () => {
+                await expect(result.current.retry()).rejects.toThrow();
+            });
+            expect(result.current.retryCount).toBe(2);
+
+            // Retry 3 should fail with max retries error
+            await act(async () => {
+                const retryResult = await result.current.retry();
+                expect(retryResult).toBeNull();
+            });
+            expect(result.current.error?.message).toContain('Maximum retry attempts');
+        });
+
+        it('returns null when no previous deployment to retry', async () => {
+            const { result } = renderHook(() => useTokenDeploy('testnet'));
+
+            await act(async () => {
+                const retryResult = await result.current.retry();
+                expect(retryResult).toBeNull();
+            });
+
+            expect(result.current.error?.code).toBe(ErrorCode.INVALID_INPUT);
+        });
+
+        it('resets retry count on successful deployment', async () => {
+            let callCount = 0;
+            vi.mocked(StellarService.prototype.deployToken).mockImplementation(() => {
+                callCount++;
+                if (callCount === 1) {
+                    return Promise.reject(new Error('Transaction failed'));
+                }
+                return Promise.resolve({
+                    tokenAddress: 'CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC',
+                    transactionHash: 'abc123',
+                    timestamp: Date.now(),
+                });
+            });
+
+            const { result } = renderHook(() => useTokenDeploy('testnet', { retryDelay: 0 }));
+
+            const params = {
+                name: 'Test Token',
+                symbol: 'TST',
+                decimals: 7,
+                initialSupply: '1000000',
+                adminWallet: 'GABCDEF1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF12',
+            };
+
+            // First attempt fails
+            await act(async () => {
+                await expect(result.current.deploy(params)).rejects.toThrow();
+            });
+
+            // Retry succeeds
+            await act(async () => {
+                await result.current.retry();
+            });
+
+            expect(result.current.retryCount).toBe(1);
+
+            // New deployment should reset retry count
+            await act(async () => {
+                await result.current.deploy(params);
+            });
+
+            expect(result.current.retryCount).toBe(0);
+        });
+    });
 });

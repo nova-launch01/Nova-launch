@@ -20,9 +20,17 @@ const STATUS_MESSAGES: Record<DeploymentStatus, string> = {
     error: 'Deployment failed.',
 };
 
-export function useTokenDeploy(network: 'testnet' | 'mainnet') {
+interface UseTokenDeployOptions {
+    maxRetries?: number;
+    retryDelay?: number;
+}
+
+export function useTokenDeploy(network: 'testnet' | 'mainnet', options: UseTokenDeployOptions = {}) {
+    const { maxRetries = 3, retryDelay = 2000 } = options;
     const [status, setStatus] = useState<DeploymentStatus>('idle');
     const [error, setError] = useState<AppError | null>(null);
+    const [retryCount, setRetryCount] = useState(0);
+    const [lastParams, setLastParams] = useState<TokenDeployParams | null>(null);
 
     const stellarService = useMemo(() => new StellarService(network), [network]);
     const ipfsService = useMemo(() => new IPFSService(), []);
@@ -31,6 +39,8 @@ export function useTokenDeploy(network: 'testnet' | 'mainnet') {
     const deploy = async (params: TokenDeployParams): Promise<DeploymentResult> => {
         setError(null);
         setStatus('idle');
+        setLastParams(params);
+        setRetryCount(0);
 
         // Track initiation (no PII). Do NOT include wallet or addresses.
         try {
@@ -151,15 +161,46 @@ export function useTokenDeploy(network: 'testnet' | 'mainnet') {
     const reset = () => {
         setStatus('idle');
         setError(null);
+        setRetryCount(0);
+        setLastParams(null);
+    };
+
+    const retry = async (): Promise<DeploymentResult | null> => {
+        if (!lastParams) {
+            const appError = createError(ErrorCode.INVALID_INPUT, 'No previous deployment to retry');
+            setError(appError);
+            return null;
+        }
+
+        if (retryCount >= maxRetries) {
+            const appError = createError(
+                ErrorCode.TRANSACTION_FAILED,
+                `Maximum retry attempts (${maxRetries}) reached`
+            );
+            setError(appError);
+            return null;
+        }
+
+        setRetryCount(prev => prev + 1);
+        
+        // Add delay before retry
+        if (retryDelay > 0) {
+            await new Promise(resolve => setTimeout(resolve, retryDelay));
+        }
+        
+        return deploy(lastParams);
     };
 
     return {
         deploy,
+        retry,
         reset,
         status,
         statusMessage: STATUS_MESSAGES[status],
         isDeploying: status === 'uploading' || status === 'deploying',
         error,
+        retryCount,
+        canRetry: retryCount < maxRetries && lastParams !== null && status === 'error',
         getFeeBreakdown: getDeploymentFeeBreakdown,
     };
 }
