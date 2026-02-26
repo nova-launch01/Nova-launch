@@ -3,6 +3,7 @@ import cors from "cors";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import dotenv from "dotenv";
+import { corsOptions } from "./config/cors";
 import adminRoutes from "./routes/admin";
 import leaderboardRoutes from "./routes/leaderboard";
 import { Database } from "./config/database";
@@ -14,12 +15,7 @@ const PORT = process.env.PORT || 3001;
 
 // Security middleware
 app.use(helmet());
-app.use(
-  cors({
-    origin: process.env.FRONTEND_URL || "http://localhost:5173",
-    credentials: true,
-  })
-);
+app.use(cors(corsOptions));
 
 // Rate limiting
 const limiter = rateLimit({
