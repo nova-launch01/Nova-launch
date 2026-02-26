@@ -1,0 +1,80 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Token {
+  id            String   @id @default(uuid())
+  address       String   @unique
+  creator       String
+  name          String
+  symbol        String
+  decimals      Int      @default(18)
+  totalSupply   BigInt
+  initialSupply BigInt
+  totalBurned   BigInt   @default(0)
+  burnCount     Int      @default(0)
+  metadataUri   String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  burnRecords BurnRecord[]
+  analytics   Analytics[]
+
+  @@index([address])
+  @@index([creator])
+  @@index([createdAt])
+  @@index([totalSupply])
+  @@index([totalBurned])
+  @@index([burnCount])
+  @@index([name])
+  @@index([symbol])
+}
+
+model BurnRecord {
+  id         String   @id @default(uuid())
+  tokenId    String
+  from       String
+  amount     BigInt
+  burnedBy   String
+  isAdminBurn Boolean @default(false)
+  txHash     String   @unique
+  timestamp  DateTime @default(now())
+
+  token Token @relation(fields: [tokenId], references: [id])
+
+  @@index([tokenId])
+  @@index([from])
+  @@index([txHash])
+  @@index([timestamp])
+}
+
+model User {
+  id         String   @id @default(uuid())
+  address    String   @unique
+  createdAt  DateTime @default(now())
+  lastActive DateTime @updatedAt
+
+  @@index([address])
+}
+
+model Analytics {
+  id            String   @id @default(uuid())
+  tokenId       String
+  date          DateTime @db.Date
+  burnVolume    BigInt   @default(0)
+  burnCount     Int      @default(0)
+  uniqueBurners Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  token Token @relation(fields: [tokenId], references: [id])
+
+  @@unique([tokenId, date])
+  @@index([tokenId])
+  @@index([date])
+}

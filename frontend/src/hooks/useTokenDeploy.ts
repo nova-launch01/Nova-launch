@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import type { AppError, DeploymentResult, DeploymentStatus, TokenDeployParams, TokenInfo } from '../types';
 import { ErrorCode } from '../types';
-import { createError, getErrorMessage } from '../utils/errors';
+import { createError, ErrorHandler, getErrorMessage } from '../utils/errors';
 import {
     isValidDescription,
     isValidImageFile,
@@ -9,6 +9,8 @@ import {
 } from '../utils/validation';
 import { IPFSService } from '../services/IPFSService';
 import { StellarService, getDeploymentFeeBreakdown } from '../services/StellarService';
+import { analytics, AnalyticsEvent } from '../services/analytics';
+import { useAnalytics } from './useAnalytics';
 
 const STATUS_MESSAGES: Record<DeploymentStatus, string> = {
     idle: '',
@@ -18,16 +20,38 @@ const STATUS_MESSAGES: Record<DeploymentStatus, string> = {
     error: 'Deployment failed.',
 };
 
-export function useTokenDeploy(network: 'testnet' | 'mainnet') {
+interface UseTokenDeployOptions {
+    maxRetries?: number;
+    retryDelay?: number;
+}
+
+export function useTokenDeploy(network: 'testnet' | 'mainnet', options: UseTokenDeployOptions = {}) {
+    const { maxRetries = 3, retryDelay = 2000 } = options;
     const [status, setStatus] = useState<DeploymentStatus>('idle');
     const [error, setError] = useState<AppError | null>(null);
+    const [retryCount, setRetryCount] = useState(0);
+    const [lastParams, setLastParams] = useState<TokenDeployParams | null>(null);
 
     const stellarService = useMemo(() => new StellarService(network), [network]);
     const ipfsService = useMemo(() => new IPFSService(), []);
+    const { trackTokenDeployed, trackTokenDeployFailed } = useAnalytics();
 
     const deploy = async (params: TokenDeployParams): Promise<DeploymentResult> => {
         setError(null);
         setStatus('idle');
+        setLastParams(params);
+        setRetryCount(0);
+
+        // Track initiation (no PII). Do NOT include wallet or addresses.
+        try {
+            analytics.track('token_deploy_initiated', {
+                network,
+                name_length: params.name ? params.name.length : 0,
+                symbol: params.symbol || '',
+                decimals: params.decimals || 0,
+                has_metadata: Boolean(params.metadata || params.metadataUri),
+            });
+        } catch {}
 
         const validation = validateTokenParams(params);
         if (!validation.valid) {
@@ -35,6 +59,12 @@ export function useTokenDeploy(network: 'testnet' | 'mainnet') {
             const appError = createError(ErrorCode.INVALID_INPUT, details);
             setError(appError);
             setStatus('error');
+            try {
+                analytics.track(AnalyticsEvent.TOKEN_DEPLOY_FAILED, {
+                    network,
+                    errorCode: appError.code,
+                });
+            } catch {}
             throw appError;
         }
 
@@ -69,9 +99,19 @@ export function useTokenDeploy(network: 'testnet' | 'mainnet') {
                     params.name
                 );
             } catch (uploadError) {
+                ErrorHandler.handle(uploadError instanceof Error ? uploadError : new Error(getErrorMessage(uploadError)), {
+                    action: 'upload-metadata',
+                    feature: 'token-deploy',
+                });
                 const appError = createError(ErrorCode.IPFS_UPLOAD_FAILED, getErrorMessage(uploadError));
                 setError(appError);
                 setStatus('error');
+                try {
+                    analytics.track(AnalyticsEvent.TOKEN_DEPLOY_FAILED, {
+                        network,
+                        errorCode: appError.code,
+                    });
+                } catch {}
                 throw appError;
             }
         }
@@ -82,13 +122,38 @@ export function useTokenDeploy(network: 'testnet' | 'mainnet') {
                 ...params,
                 metadataUri,
             });
+            try {
+                analytics.track(AnalyticsEvent.TOKEN_DEPLOYED, {
+                    network,
+                    name_length: params.name ? params.name.length : 0,
+                    symbol: params.symbol || '',
+                    decimals: params.decimals || 0,
+                });
+            } catch {}
             saveDeploymentRecord(params, result, metadataUri);
             setStatus('success');
+            trackTokenDeployed(params.symbol, network);
             return result;
         } catch (deployError) {
+            ErrorHandler.handle(deployError instanceof Error ? deployError : new Error(getErrorMessage(deployError)), {
+                action: 'deploy-token',
+                feature: 'token-deploy',
+                metadata: {
+                    name: params.name,
+                    symbol: params.symbol,
+                    hasMetadata: Boolean(metadataUri),
+                },
+            });
             const appError = mapDeploymentError(deployError);
+            try {
+                analytics.track(AnalyticsEvent.TOKEN_DEPLOY_FAILED, {
+                    network,
+                    errorCode: appError.code,
+                });
+            } catch {}
             setError(appError);
             setStatus('error');
+            trackTokenDeployFailed(appError.message, network);
             throw appError;
         }
     };
@@ -96,15 +161,46 @@ export function useTokenDeploy(network: 'testnet' | 'mainnet') {
     const reset = () => {
         setStatus('idle');
         setError(null);
+        setRetryCount(0);
+        setLastParams(null);
+    };
+
+    const retry = async (): Promise<DeploymentResult | null> => {
+        if (!lastParams) {
+            const appError = createError(ErrorCode.INVALID_INPUT, 'No previous deployment to retry');
+            setError(appError);
+            return null;
+        }
+
+        if (retryCount >= maxRetries) {
+            const appError = createError(
+                ErrorCode.TRANSACTION_FAILED,
+                `Maximum retry attempts (${maxRetries}) reached`
+            );
+            setError(appError);
+            return null;
+        }
+
+        setRetryCount(prev => prev + 1);
+        
+        // Add delay before retry
+        if (retryDelay > 0) {
+            await new Promise(resolve => setTimeout(resolve, retryDelay));
+        }
+        
+        return deploy(lastParams);
     };
 
     return {
         deploy,
+        retry,
         reset,
         status,
         statusMessage: STATUS_MESSAGES[status],
         isDeploying: status === 'uploading' || status === 'deploying',
         error,
+        retryCount,
+        canRetry: retryCount < maxRetries && lastParams !== null && status === 'error',
         getFeeBreakdown: getDeploymentFeeBreakdown,
     };
 }

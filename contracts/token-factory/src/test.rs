@@ -28,7 +28,22 @@ fn test_initialize() {
 }
 
 #[test]
-fn test_initialize_with_various_fees() {
+#[should_panic(expected = "Error(Contract, #3)")]
+fn test_negative_base_fee_rejected() {
+    let env = Env::default();
+    let contract_id = env.register_contract(None, TokenFactory);
+    let client = TokenFactoryClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    let treasury = Address::generate(&env);
+
+    // Negative base fee should be rejected
+    client.initialize(&admin, &treasury, &-1, &30_000_000);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3)")]
+fn test_negative_metadata_fee_rejected() {
     let env = Env::default();
 
     // Test with minimum fees
@@ -63,6 +78,32 @@ fn test_initialize_with_various_fees() {
     let state_3 = client_3.get_state();
     assert_eq!(state_3.base_fee, 50_000_000);
     assert_eq!(state_3.metadata_fee, 0);
+}
+
+#[test]
+fn test_admin_transfer_integration() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract_id = env.register_contract(None, TokenFactory);
+    let client = TokenFactoryClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    let treasury = Address::generate(&env);
+    let new_admin = Address::generate(&env);
+
+    // Initialize
+    client.initialize(&admin, &treasury, &100_0000000, &50_0000000);
+
+    // Transfer admin
+    client.transfer_admin(&admin, &new_admin);
+
+    // Verify new admin can perform admin operations
+    client.update_fees(&new_admin, &Some(200_0000000), &None);
+    
+    let state = client.get_state();
+    assert_eq!(state.admin, new_admin);
+    assert_eq!(state.base_fee, 200_0000000);
 }
 
 #[test]
@@ -116,9 +157,9 @@ fn test_cannot_initialize_twice_with_different_params() {
     );
 }
 
-    /// Tests for updating factory fee structure including base and metadata fees.
-    #[test]
-    fn test_update_fees() {
+/// Tests for updating factory fee structure including base and metadata fees.
+#[test]
+fn test_update_fees() {
     let env = Env::default();
     env.mock_all_auths();
 
@@ -140,6 +181,68 @@ fn test_cannot_initialize_twice_with_different_params() {
     client.update_fees(&admin, &None, &Some(50_000_000));
     let state = client.get_state();
     assert_eq!(state.metadata_fee, 50_000_000);
+}
+
+#[test]
+fn test_get_base_fee() {
+    let env = Env::default();
+    let contract_id = env.register_contract(None, TokenFactory);
+    let client = TokenFactoryClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    let treasury = Address::generate(&env);
+    let base_fee = 70_000_000; // 7 XLM in stroops
+    let metadata_fee = 30_000_000; // 3 XLM in stroops
+
+    // Initialize factory
+    client.initialize(&admin, &treasury, &base_fee, &metadata_fee);
+
+    // Test get_base_fee
+    let retrieved_base_fee = client.get_base_fee();
+    assert_eq!(retrieved_base_fee, base_fee);
+}
+
+#[test]
+fn test_get_metadata_fee() {
+    let env = Env::default();
+    let contract_id = env.register_contract(None, TokenFactory);
+    let client = TokenFactoryClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    let treasury = Address::generate(&env);
+    let base_fee = 70_000_000;
+    let metadata_fee = 30_000_000;
+
+    // Initialize factory
+    client.initialize(&admin, &treasury, &base_fee, &metadata_fee);
+
+    // Test get_metadata_fee
+    let retrieved_metadata_fee = client.get_metadata_fee();
+    assert_eq!(retrieved_metadata_fee, metadata_fee);
+}
+
+#[test]
+fn test_fee_getters_after_update() {
+    let env = Env::default();
+    env.mock_all_auths();
+    
+    let contract_id = env.register_contract(None, TokenFactory);
+    let client = TokenFactoryClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    let treasury = Address::generate(&env);
+
+    // Initialize with initial fees
+    client.initialize(&admin, &treasury, &70_000_000, &30_000_000);
+
+    // Update fees
+    let new_base_fee = 100_000_000;
+    let new_metadata_fee = 50_000_000;
+    client.update_fees(&admin, &Some(new_base_fee), &Some(new_metadata_fee));
+
+    // Verify getters return updated values
+    assert_eq!(client.get_base_fee(), new_base_fee);
+    assert_eq!(client.get_metadata_fee(), new_metadata_fee);
     assert_eq!(state.base_fee, 100_000_000); // Verify base fee unchanged
 
     // Update both fees simultaneously
@@ -171,6 +274,42 @@ fn test_unauthorized_fee_update() {
 
     // Non-admin attempts to update fees - should panic with Unauthorized error (#2)
     client.update_fees(&non_admin, &Some(100_000_000), &None);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3)")]
+fn test_update_fees_negative_base_fee_rejected() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract_id = env.register_contract(None, TokenFactory);
+    let client = TokenFactoryClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    let treasury = Address::generate(&env);
+
+    client.initialize(&admin, &treasury, &70_000_000, &30_000_000);
+
+    // Negative base fee should be rejected
+    client.update_fees(&admin, &Some(-1), &None);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3)")]
+fn test_update_fees_negative_metadata_fee_rejected() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract_id = env.register_contract(None, TokenFactory);
+    let client = TokenFactoryClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    let treasury = Address::generate(&env);
+
+    client.initialize(&admin, &treasury, &70_000_000, &30_000_000);
+
+    // Negative metadata fee should be rejected
+    client.update_fees(&admin, &None, &Some(-1));
 }
 
 #[test]
@@ -386,4 +525,438 @@ fn test_create_token_invalid_parameters() {
         &70_000_000,
     );
     */
+}
+
+// ============================================================================
+// Burn Function Tests - Issue #155
+// ============================================================================
+
+#[test]
+fn test_burn_success() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let admin = Address::generate(&env);
+    let treasury = Address::generate(&env);
+    let user = Address::generate(&env);
+
+    let factory = TokenFactoryClient::new(&env, &env.register_contract(None, TokenFactory));
+
+    factory.initialize(&admin, &treasury, &70_000_000, &30_000_000);
+
+    let token_address = factory.create_token(
+        &user,
+        &String::from_str(&env, "Test Token"),
+        &String::from_str(&env, "TEST"),
+        &7,
+        &1_000_000,
+        &None,
+        &70_000_000,
+    );
+
+    let burn_amount = 100_000;
+    factory.burn(&token_address, &user, &burn_amount);
+
+    let token_info = factory.get_token_info_by_address(&token_address);
+    assert_eq!(token_info.total_supply, 900_000);
+    assert_eq!(token_info.total_burned, 100_000);
+}
+
+#[test]
+fn test_burn_entire_balance() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let admin = Address::generate(&env);
+    let treasury = Address::generate(&env);
+    let user = Address::generate(&env);
+
+    let factory = TokenFactoryClient::new(&env, &env.register_contract(None, TokenFactory));
+    factory.initialize(&admin, &treasury, &70_000_000, &30_000_000);
+
+    let initial_supply = 500_000;
+    let token_address = factory.create_token(
+        &user,
+        &String::from_str(&env, "Burn All"),
+        &String::from_str(&env, "BALL"),
+        &7,
+        &initial_supply,
+        &None,
+        &70_000_000,
+    );
+
+    factory.burn(&token_address, &user, &initial_supply);
+
+    let token_info = factory.get_token_info_by_address(&token_address);
+    assert_eq!(token_info.total_supply, 0);
+    assert_eq!(token_info.total_burned, initial_supply);
+}
+
+#[test]
+fn test_burn_multiple_times() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let admin = Address::generate(&env);
+    let treasury = Address::generate(&env);
+    let user = Address::generate(&env);
+
+    let factory = TokenFactoryClient::new(&env, &env.register_contract(None, TokenFactory));
+    factory.initialize(&admin, &treasury, &70_000_000, &30_000_000);
+
+    let token_address = factory.create_token(
+        &user,
+        &String::from_str(&env, "Multi Burn"),
+        &String::from_str(&env, "MBRN"),
+        &7,
+        &1_000_000,
+        &None,
+        &70_000_000,
+    );
+
+    factory.burn(&token_address, &user, &100_000);
+    factory.burn(&token_address, &user, &200_000);
+    factory.burn(&token_address, &user, &150_000);
+
+    let token_info = factory.get_token_info_by_address(&token_address);
+    assert_eq!(token_info.total_supply, 550_000);
+    assert_eq!(token_info.total_burned, 450_000);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #9)")]
+fn test_burn_zero_amount() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let admin = Address::generate(&env);
+    let treasury = Address::generate(&env);
+    let user = Address::generate(&env);
+
+    let factory = TokenFactoryClient::new(&env, &env.register_contract(None, TokenFactory));
+    factory.initialize(&admin, &treasury, &70_000_000, &30_000_000);
+
+    let token_address = factory.create_token(
+        &user,
+        &String::from_str(&env, "Zero Test"),
+        &String::from_str(&env, "ZERO"),
+        &7,
+        &1_000_000,
+        &None,
+        &70_000_000,
+    );
+
+    factory.burn(&token_address, &user, &0);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #9)")]
+fn test_burn_negative_amount() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let admin = Address::generate(&env);
+    let treasury = Address::generate(&env);
+    let user = Address::generate(&env);
+
+    let factory = TokenFactoryClient::new(&env, &env.register_contract(None, TokenFactory));
+    factory.initialize(&admin, &treasury, &70_000_000, &30_000_000);
+
+    let token_address = factory.create_token(
+        &user,
+        &String::from_str(&env, "Negative Test"),
+        &String::from_str(&env, "NEG"),
+        &7,
+        &1_000_000,
+        &None,
+        &70_000_000,
+    );
+
+    factory.burn(&token_address, &user, &-100);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #7)")]
+fn test_burn_exceeds_balance() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let admin = Address::generate(&env);
+    let treasury = Address::generate(&env);
+    let user = Address::generate(&env);
+
+    let factory = TokenFactoryClient::new(&env, &env.register_contract(None, TokenFactory));
+    factory.initialize(&admin, &treasury, &70_000_000, &30_000_000);
+
+    let token_address = factory.create_token(
+        &user,
+        &String::from_str(&env, "Exceed Test"),
+        &String::from_str(&env, "EXCD"),
+        &7,
+        &1_000_000,
+        &None,
+        &70_000_000,
+    );
+
+    factory.burn(&token_address, &user, &2_000_000);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #4)")]
+fn test_burn_nonexistent_token() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let admin = Address::generate(&env);
+    let treasury = Address::generate(&env);
+    let user = Address::generate(&env);
+
+    let factory = TokenFactoryClient::new(&env, &env.register_contract(None, TokenFactory));
+    factory.initialize(&admin, &treasury, &70_000_000, &30_000_000);
+
+    let fake_token_address = Address::generate(&env);
+    factory.burn(&fake_token_address, &user, &100_000);
+}
+
+#[test]
+fn test_admin_burn_success() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let admin = Address::generate(&env);
+    let treasury = Address::generate(&env);
+    let creator = Address::generate(&env);
+    let user = Address::generate(&env);
+
+    let factory = TokenFactoryClient::new(&env, &env.register_contract(None, TokenFactory));
+    factory.initialize(&admin, &treasury, &70_000_000, &30_000_000);
+
+    let token_address = factory.create_token(
+        &creator,
+        &String::from_str(&env, "Admin Burn"),
+        &String::from_str(&env, "ABRN"),
+        &7,
+        &1_000_000,
+        &None,
+        &70_000_000,
+    );
+
+    factory.admin_burn(&token_address, &creator, &user, &300_000);
+
+    let token_info = factory.get_token_info_by_address(&token_address);
+    assert_eq!(token_info.total_supply, 700_000);
+    assert_eq!(token_info.total_burned, 300_000);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #2)")]
+fn test_admin_burn_unauthorized() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let admin = Address::generate(&env);
+    let treasury = Address::generate(&env);
+    let creator = Address::generate(&env);
+    let non_admin = Address::generate(&env);
+    let user = Address::generate(&env);
+
+    let factory = TokenFactoryClient::new(&env, &env.register_contract(None, TokenFactory));
+    factory.initialize(&admin, &treasury, &70_000_000, &30_000_000);
+
+    let token_address = factory.create_token(
+        &creator,
+        &String::from_str(&env, "Unauth Test"),
+        &String::from_str(&env, "UNTH"),
+        &7,
+        &1_000_000,
+        &None,
+        &70_000_000,
+    );
+
+    factory.admin_burn(&token_address, &non_admin, &user, &100_000);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #9)")]
+fn test_admin_burn_zero_amount() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let admin = Address::generate(&env);
+    let treasury = Address::generate(&env);
+    let creator = Address::generate(&env);
+    let user = Address::generate(&env);
+
+    let factory = TokenFactoryClient::new(&env, &env.register_contract(None, TokenFactory));
+    factory.initialize(&admin, &treasury, &70_000_000, &30_000_000);
+
+    let token_address = factory.create_token(
+        &creator,
+        &String::from_str(&env, "Zero Admin"),
+        &String::from_str(&env, "ZADM"),
+        &7,
+        &1_000_000,
+        &None,
+        &70_000_000,
+    );
+
+    factory.admin_burn(&token_address, &creator, &user, &0);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #7)")]
+fn test_admin_burn_exceeds_balance() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let admin = Address::generate(&env);
+    let treasury = Address::generate(&env);
+    let creator = Address::generate(&env);
+    let user = Address::generate(&env);
+
+    let factory = TokenFactoryClient::new(&env, &env.register_contract(None, TokenFactory));
+    factory.initialize(&admin, &treasury, &70_000_000, &30_000_000);
+
+    let token_address = factory.create_token(
+        &creator,
+        &String::from_str(&env, "Exceed Admin"),
+        &String::from_str(&env, "EXAD"),
+        &7,
+        &1_000_000,
+        &None,
+        &70_000_000,
+    );
+
+    factory.admin_burn(&token_address, &creator, &user, &2_000_000);
+}
+
+#[test]
+fn test_burn_batch_success() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let admin = Address::generate(&env);
+    let treasury = Address::generate(&env);
+    let creator = Address::generate(&env);
+    let user1 = Address::generate(&env);
+    let user2 = Address::generate(&env);
+    let user3 = Address::generate(&env);
+
+    let factory = TokenFactoryClient::new(&env, &env.register_contract(None, TokenFactory));
+    factory.initialize(&admin, &treasury, &70_000_000, &30_000_000);
+
+    let token_address = factory.create_token(
+        &creator,
+        &String::from_str(&env, "Batch Token"),
+        &String::from_str(&env, "BATCH"),
+        &7,
+        &10_000_000,
+        &None,
+        &70_000_000,
+    );
+
+    let burns = soroban_sdk::vec![
+        &env,
+        (user1.clone(), 100_000),
+        (user2.clone(), 200_000),
+        (user3.clone(), 150_000),
+    ];
+
+    factory.burn_batch(&token_address, &burns);
+
+    let info = factory.get_token_info_by_address(&token_address);
+    assert_eq!(info.total_supply, 9_550_000);
+    assert_eq!(info.total_burned, 450_000);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #9)")]
+fn test_burn_batch_invalid_amount() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let admin = Address::generate(&env);
+    let treasury = Address::generate(&env);
+    let creator = Address::generate(&env);
+    let user1 = Address::generate(&env);
+    let user2 = Address::generate(&env);
+
+    let factory = TokenFactoryClient::new(&env, &env.register_contract(None, TokenFactory));
+    factory.initialize(&admin, &treasury, &70_000_000, &30_000_000);
+
+    let token_address = factory.create_token(
+        &creator,
+        &String::from_str(&env, "Invalid Batch"),
+        &String::from_str(&env, "INVB"),
+        &7,
+        &10_000_000,
+        &None,
+        &70_000_000,
+    );
+
+    let burns = soroban_sdk::vec![&env, (user1.clone(), 100_000), (user2.clone(), 0),];
+
+    factory.burn_batch(&token_address, &burns);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #7)")]
+fn test_burn_batch_exceeds_supply() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let admin = Address::generate(&env);
+    let treasury = Address::generate(&env);
+    let creator = Address::generate(&env);
+    let user1 = Address::generate(&env);
+    let user2 = Address::generate(&env);
+
+    let factory = TokenFactoryClient::new(&env, &env.register_contract(None, TokenFactory));
+    factory.initialize(&admin, &treasury, &70_000_000, &30_000_000);
+
+    let token_address = factory.create_token(
+        &creator,
+        &String::from_str(&env, "Exceed Batch"),
+        &String::from_str(&env, "EXCB"),
+        &7,
+        &1_000_000,
+        &None,
+        &70_000_000,
+    );
+
+    let burns = soroban_sdk::vec![&env, (user1.clone(), 600_000), (user2.clone(), 500_000),];
+
+    factory.burn_batch(&token_address, &burns);
+}
+
+#[test]
+fn test_burn_batch_single_address() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let admin = Address::generate(&env);
+    let treasury = Address::generate(&env);
+    let creator = Address::generate(&env);
+    let user = Address::generate(&env);
+
+    let factory = TokenFactoryClient::new(&env, &env.register_contract(None, TokenFactory));
+    factory.initialize(&admin, &treasury, &70_000_000, &30_000_000);
+
+    let token_address = factory.create_token(
+        &creator,
+        &String::from_str(&env, "Single Batch"),
+        &String::from_str(&env, "SINB"),
+        &7,
+        &5_000_000,
+        &None,
+        &70_000_000,
+    );
+
+    let burns = soroban_sdk::vec![&env, (user.clone(), 1_000_000)];
+
+    factory.burn_batch(&token_address, &burns);
+
+    let info = factory.get_token_info_by_address(&token_address);
+    assert_eq!(info.total_supply, 4_000_000);
+    assert_eq!(info.total_burned, 1_000_000);
 }

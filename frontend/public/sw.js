@@ -32,6 +32,15 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
+  if (
+    requestUrl.pathname.startsWith("/@vite") ||
+    requestUrl.pathname.startsWith("/@fs") ||
+    requestUrl.pathname.startsWith("/src/") ||
+    requestUrl.pathname.includes("/node_modules/")
+  ) {
+    return;
+  }
+
   if (request.mode === "navigate") {
     event.respondWith(
       fetch(request)

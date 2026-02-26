@@ -1,7 +1,15 @@
 export * from './validation';
+export * from './burnValidation';
 export * from './formatting';
-export { createError, isAppError } from './errors';
-export { ERROR_MESSAGES } from './errors';
+export {
+  createError,
+  isAppError,
+  getErrorMessage,
+  ErrorHandler,
+  setupGlobalErrorHandling,
+  ERROR_MESSAGES,
+  ERROR_RECOVERY_SUGGESTIONS,
+} from './errors';
 export {
   validateImage,
   validateFileType,

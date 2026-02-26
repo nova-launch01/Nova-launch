@@ -1,3 +1,6 @@
+// Suppress unused warnings for incomplete tests
+#![allow(dead_code)]
+
 use super::*;
 use proptest::prelude::*;
 use soroban_sdk::testutils::Address as _;
@@ -213,7 +216,7 @@ proptest! {
         */
 
         // For now, simulate the test structure
-        let result: Result<Address, _> = Ok(Address::generate(&env));
+        let result: Result<Address, Error> = Ok(Address::generate(&env));
 
         if result.is_ok() {
             // SUCCESS CASE: Verify all effects occurred atomically
@@ -236,7 +239,7 @@ proptest! {
             );
 
             // Property 3: Token info matches input parameters
-            let token_info = token_info_result.unwrap();
+            let token_info = token_info_result.unwrap().unwrap();
             prop_assert_eq!(token_info.address, token_address, "Token address must match");
             prop_assert_eq!(token_info.creator, creator, "Creator must match");
             prop_assert_eq!(token_info.name, name, "Name must match");
@@ -326,7 +329,7 @@ proptest! {
         */
 
         // Simulate failure for invalid params
-        let result: Result<Address, _> = Err(Error::InvalidParameters);
+        let result: Result<Address, Error> = Err(Error::InvalidParameters);
 
         // Property 1: Invalid parameters must fail
         prop_assert!(result.is_err(), "Invalid parameters must cause failure");
@@ -400,7 +403,7 @@ proptest! {
         );
         */
 
-        let result: Result<Address, _> = Err(Error::InsufficientFee);
+        let result: Result<Address, Error> = Err(Error::InsufficientFee);
 
         // Property 1: Must fail with insufficient fee
         prop_assert!(result.is_err(), "Insufficient fee must cause failure");
@@ -461,7 +464,7 @@ proptest! {
             );
             */
 
-            let result: Result<Address, _> = Ok(Address::generate(&env));
+            let result: Result<Address, Error> = Ok(Address::generate(&env));
 
             if result.is_ok() {
                 expected_count += 1;
@@ -530,7 +533,7 @@ mod manual_atomicity_tests {
         );
         */
 
-        let result: Result<Address, _> = Ok(Address::generate(&env));
+        let result: Result<Address, Error> = Ok(Address::generate(&env));
 
         if result.is_ok() {
             let final_state = ContractState::capture(&client);
@@ -580,7 +583,7 @@ mod manual_atomicity_tests {
         );
         */
 
-        let result: Result<Address, _> = Ok(Address::generate(&env));
+        let result: Result<Address, Error> = Ok(Address::generate(&env));
 
         if result.is_ok() {
             let token_info = client.get_token_info(&0);
@@ -611,8 +614,8 @@ mod manual_atomicity_tests {
             let initial_count = client.get_token_count();
             let creator = Address::generate(&env);
 
-            let name = String::from_str(&env, &format!("Token {}", i));
-            let symbol = String::from_str(&env, &format!("TK{}", i));
+            let name = String::from_str(&env, "Token");
+            let symbol = String::from_str(&env, "TKN");
 
             /*
             let result = client.try_create_token(
@@ -626,7 +629,7 @@ mod manual_atomicity_tests {
             );
             */
 
-            let result: Result<Address, _> = Ok(Address::generate(&env));
+            let result: Result<Address, Error> = Ok(Address::generate(&env));
 
             if result.is_ok() {
                 let new_count = client.get_token_count();
