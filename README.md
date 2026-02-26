@@ -7,14 +7,15 @@
 ![Coverage](https://codecov.io/gh/Emmyt24/Nova-launch/branch/main/graph/badge.svg)
 
 ![Stellar](https://img.shields.io/badge/Stellar-Soroban-7D00FF?style=for-the-badge&logo=stellar)
-![React](https://img.shields.io/badge/React-18-61DAFB?style=for-the-badge&logo=react)
+![React](https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178C6?style=for-the-badge&logo=typescript)
 ![Rust](https://img.shields.io/badge/Rust-2021-000000?style=for-the-badge&logo=rust)
 ![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)
+![Coverage](https://img.shields.io/badge/Coverage->80%25-brightgreen?style=for-the-badge)
 
 **A user-friendly dApp for quick token deployment on Stellar, targeting creators in Nigeria and emerging markets.**
 
-[Features](#-features) • [Quick Start](#-quick-start) • [Documentation](#-documentation) • [Contributing](#-contributing) • [Roadmap](#-roadmap)
+[Features](#-features) • [Quick Start](#-quick-start) • [User Guides](docs/user-guides/README.md) • [Documentation](#-documentation) • [Contributing](#-contributing) • [Roadmap](#-roadmap)
 
 </div>
 
@@ -57,6 +58,7 @@
 - **🌍 Emerging Markets Focus**: Optimized for users in Nigeria and other developing regions
 - **🔒 Secure**: Non-custodial, wallet-based authentication
 - **📱 Mobile-First**: Responsive design for all devices
+- **📲 PWA Support**: Install as an app on any device with offline capabilities
 
 ### Core Value Proposition
 
@@ -85,6 +87,8 @@ Pay minimal XLM fees to deploy and mint tokens directly to your wallet. Optional
 - ✅ Transaction history tracking
 - ✅ Responsive, mobile-first design
 - ✅ Accessibility compliant (WCAG 2.1)
+- ✅ PWA support with offline mode
+- ✅ Installable on mobile and desktop
 
 #### 🖼️ Metadata Support
 - ✅ Optional IPFS metadata upload
@@ -287,23 +291,25 @@ soroban contract optimize \
 #### Deploy Contract to Testnet
 
 ```bash
-# Deploy
-soroban contract deploy \
-  --wasm target/wasm32-unknown-unknown/release/token_factory.wasm \
-  --network testnet \
-  --source admin
+# Quick deployment (recommended)
+./scripts/deploy-testnet.sh
 
-# Initialize factory
-soroban contract invoke \
-  --id <CONTRACT_ID> \
-  --network testnet \
-  --source admin \
-  -- initialize \
-  --admin <ADMIN_ADDRESS> \
-  --treasury <TREASURY_ADDRESS> \
-  --base_fee 70000000 \
-  --metadata_fee 30000000
+# This script will:
+# - Verify admin identity
+# - Create treasury identity if needed
+# - Deploy the contract
+# - Initialize with proper configuration
+# - Save deployment info to deployment-testnet.json
+# - Run basic smoke tests
+
+# Verify deployment
+./scripts/verify-deployment.sh
+
+# Update frontend environment
+./scripts/update-frontend-env.sh
 ```
+
+For detailed deployment instructions, see [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md).
 
 ---
 
@@ -423,6 +429,61 @@ pub fn mint_tokens(
 ) -> Result<(), Error>
 ```
 
+##### `burn`
+Allows token holders to burn their own tokens, permanently removing them from circulation.
+
+```rust
+pub fn burn(
+    env: Env,
+    token_address: Address,
+    from: Address,
+    amount: i128,
+) -> Result<(), Error>
+```
+
+**Parameters:**
+- `token_address`: Address of the token contract
+- `from`: Address of the token holder burning tokens
+- `amount`: Amount of tokens to burn (in smallest unit)
+
+**Example:**
+```rust
+// Burn 1000 tokens (with 7 decimals)
+factory.burn(
+    &token_address,
+    &user_address,
+    &1000_0000000
+);
+```
+
+##### `admin_burn`
+Allows token admin to burn tokens from any address (clawback).
+
+```rust
+pub fn admin_burn(
+    env: Env,
+    token_address: Address,
+    admin: Address,
+    from: Address,
+    amount: i128,
+) -> Result<(), Error>
+```
+
+**Security Note:** Only the token creator can perform admin burns.
+
+##### `burn_batch`
+Burn tokens from multiple addresses in a single transaction.
+
+```rust
+pub fn burn_batch(
+    env: Env,
+    token_address: Address,
+    burns: Vec<(Address, i128)>,
+) -> Result<(), Error>
+```
+
+**Gas Optimization:** More efficient than multiple individual burns.
+
 ##### `update_fees`
 Update fee structure (admin only).
 
@@ -441,6 +502,24 @@ Get current factory state.
 ```rust
 pub fn get_state(env: Env) -> FactoryState
 ```
+
+##### `get_base_fee`
+Get the current base fee for token deployment.
+
+```rust
+pub fn get_base_fee(env: Env) -> i128
+```
+
+Returns the base fee amount in stroops that must be paid for any token deployment, regardless of metadata inclusion.
+
+##### `get_metadata_fee`
+Get the current metadata fee for token deployment.
+
+```rust
+pub fn get_metadata_fee(env: Env) -> i128
+```
+
+Returns the additional fee amount in stroops that must be paid when deploying a token with metadata (IPFS URI).
 
 ##### `get_token_info`
 Get information about a deployed token.
@@ -462,6 +541,22 @@ pub fn get_token_info(
 | 4 | `TokenNotFound` | Token not found in registry |
 | 5 | `MetadataAlreadySet` | Metadata already set for token |
 | 6 | `AlreadyInitialized` | Factory already initialized |
+| 7 | `BurnAmountExceedsBalance` | Burn amount exceeds token balance |
+| 8 | `BurnNotEnabled` | Burn functionality not enabled |
+| 9 | `InvalidBurnAmount` | Burn amount is zero or negative |
+
+#### Events
+
+##### `TokenBurned`
+Emitted when tokens are burned.
+
+**Data:**
+- `token_address`: Address
+- `from`: Address
+- `amount`: i128
+- `burned_by`: Address
+- `timestamp`: u64
+- `is_admin_burn`: bool
 
 ---
 

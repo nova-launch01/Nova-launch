@@ -1,23 +1,83 @@
-import { useEffect } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import type { ToastType } from '../../providers/ToastProvider';
 
-interface ToastProps {
-    message: string;
-    type?: 'success' | 'error' | 'info' | 'warning';
-    onClose: () => void;
-    duration?: number;
+export interface ToastAction {
+    label: string;
+    onClick: () => void;
 }
 
-export function Toast({ message, type = 'info', onClose, duration = 5000 }: ToastProps) {
+interface ToastProps {
+    id: string;
+    message: string;
+    type?: ToastType;
+    onClose: (id: string) => void;
+    duration?: number;
+    action?: ToastAction;
+    showProgress?: boolean;
+}
+
+export function Toast({ id, message, type = 'info', onClose, duration = 5000, action, showProgress = true }: ToastProps) {
+    const [isVisible, setIsVisible] = useState(false);
+    const [isExiting, setIsExiting] = useState(false);
+    const [progress, setProgress] = useState(100);
+    const closeTimerRef = useRef<number | null>(null);
+    const progressIntervalRef = useRef<number | null>(null);
+
+    const dismiss = useCallback(() => {
+        if (isExiting) {
+            return;
+        }
+
+        setIsExiting(true);
+        closeTimerRef.current = window.setTimeout(() => {
+            onClose(id);
+        }, 300);
+    }, [id, isExiting, onClose]);
+
     useEffect(() => {
-        const timer = setTimeout(onClose, duration);
-        return () => clearTimeout(timer);
-    }, [duration, onClose]);
+        const frame = window.requestAnimationFrame(() => {
+            setIsVisible(true);
+        });
+        return () => window.cancelAnimationFrame(frame);
+    }, []);
+
+    useEffect(() => {
+        if (showProgress && duration > 0) {
+            const interval = 50;
+            const decrement = (interval / duration) * 100;
+            
+            progressIntervalRef.current = window.setInterval(() => {
+                setProgress((prev) => {
+                    const next = prev - decrement;
+                    return next < 0 ? 0 : next;
+                });
+            }, interval);
+        }
+
+        const timer = window.setTimeout(dismiss, duration);
+        
+        return () => {
+            window.clearTimeout(timer);
+            if (progressIntervalRef.current !== null) {
+                window.clearInterval(progressIntervalRef.current);
+            }
+        };
+    }, [dismiss, duration, showProgress]);
+
+    useEffect(
+        () => () => {
+            if (closeTimerRef.current !== null) {
+                window.clearTimeout(closeTimerRef.current);
+            }
+        },
+        []
+    );
 
     const typeStyles = {
-        success: 'bg-green-500 text-white',
-        error: 'bg-red-500 text-white',
-        info: 'bg-blue-500 text-white',
-        warning: 'bg-yellow-500 text-gray-900',
+        success: 'bg-green-600 text-white',
+        error: 'bg-red-600 text-white',
+        info: 'bg-blue-600 text-white',
+        warning: 'bg-amber-400 text-gray-900',
     };
 
     const icons = {
@@ -61,24 +121,53 @@ export function Toast({ message, type = 'info', onClose, duration = 5000 }: Toas
 
     return (
         <div
-            className={`fixed bottom-4 right-4 z-50 flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg ${typeStyles[type]} animate-slide-up`}
-            role="alert"
+            className={`pointer-events-auto relative flex w-full flex-col overflow-hidden rounded-lg shadow-lg transition-all duration-300 ease-out ${typeStyles[type]} ${
+                isVisible && !isExiting ? 'translate-x-0 opacity-100 scale-100' : 'translate-x-4 opacity-0 scale-95'
+            }`}
+            role={type === 'error' || type === 'warning' ? 'alert' : 'status'}
+            aria-live={type === 'error' || type === 'warning' ? 'assertive' : 'polite'}
         >
-            {icons[type]}
-            <span className="text-sm font-medium">{message}</span>
-            <button
-                onClick={onClose}
-                className="ml-2 hover:opacity-75 transition-opacity"
-                aria-label="Close notification"
-            >
-                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                    <path
-                        fillRule="evenodd"
-                        d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
-                        clipRule="evenodd"
+            <div className="flex items-center gap-3 px-4 py-3">
+                {icons[type]}
+                <span className="flex-1 text-sm font-medium">{message}</span>
+                {action && (
+                    <button
+                        onClick={() => {
+                            action.onClick();
+                            dismiss();
+                        }}
+                        className="rounded px-3 py-1 text-xs font-semibold transition-colors hover:bg-white/20"
+                        aria-label={action.label}
+                    >
+                        {action.label}
+                    </button>
+                )}
+                <button
+                    onClick={dismiss}
+                    className="hover:opacity-75 transition-opacity"
+                    aria-label="Dismiss notification"
+                >
+                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                        <path
+                            fillRule="evenodd"
+                            d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                            clipRule="evenodd"
+                        />
+                    </svg>
+                </button>
+            </div>
+            {showProgress && duration > 0 && (
+                <div className="h-1 w-full bg-black/20">
+                    <div
+                        className="h-full bg-white/40 transition-all duration-50 ease-linear"
+                        style={{ width: `${progress}%` }}
+                        role="progressbar"
+                        aria-valuenow={progress}
+                        aria-valuemin={0}
+                        aria-valuemax={100}
                     />
-                </svg>
-            </button>
+                </div>
+            )}
         </div>
     );
 }

@@ -1,0 +1,88 @@
+.burn-button {
+  position: relative;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.burn-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(255, 59, 46, 0.3);
+}
+
+.burn-button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.burn-button-content {
+  display: inline-flex;
+  align-items: center;
+}
+
+.burn-icon {
+  width: 20px;
+  height: 20px;
+  margin-right: 8px;
+  animation: burn-flicker 2s infinite;
+}
+
+.burn-icon--sm {
+  width: 16px;
+  height: 16px;
+}
+
+.burn-icon--lg {
+  width: 24px;
+  height: 24px;
+}
+
+@keyframes burn-flicker {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
+.burn-spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: burn-spin 0.6s linear infinite;
+  margin-right: 8px;
+}
+
+.burn-spinner--sm {
+  width: 14px;
+  height: 14px;
+}
+
+.burn-spinner--lg {
+  width: 18px;
+  height: 18px;
+}
+
+@keyframes burn-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .burn-button {
+    transition: none;
+  }
+
+  .burn-button:hover:not(:disabled),
+  .burn-button:active:not(:disabled) {
+    transform: none;
+  }
+
+  .burn-icon,
+  .burn-spinner {
+    animation: none;
+  }
+}

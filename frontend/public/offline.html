@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="You are currently offline" />
+    <title>Offline - Nova Launch</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto",
+          "Oxygen", "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans",
+          "Helvetica Neue", sans-serif;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1rem;
+      }
+
+      .offline-container {
+        background: white;
+        border-radius: 1rem;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        max-width: 500px;
+        padding: 2rem;
+        text-align: center;
+      }
+
+      .offline-icon {
+        width: 80px;
+        height: 80px;
+        margin: 0 auto 1.5rem;
+        opacity: 0.8;
+      }
+
+      h1 {
+        color: #1f2937;
+        font-size: 1.75rem;
+        margin-bottom: 0.5rem;
+      }
+
+      .offline-status {
+        color: #764ba2;
+        font-size: 0.875rem;
+        margin-bottom: 1rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+
+      p {
+        color: #6b7280;
+        font-size: 1rem;
+        line-height: 1.6;
+        margin-bottom: 2rem;
+      }
+
+      ul {
+        text-align: left;
+        background: #f9fafb;
+        border-radius: 0.75rem;
+        padding: 1.5rem;
+        margin-bottom: 2rem;
+        color: #374151;
+        font-size: 0.875rem;
+      }
+
+      li {
+        margin-bottom: 0.75rem;
+        display: flex;
+        align-items: center;
+      }
+
+      li::before {
+        content: "✓";
+        color: #10b981;
+        font-weight: bold;
+        margin-right: 0.75rem;
+        font-size: 1.125rem;
+      }
+
+      li:last-child {
+        margin-bottom: 0;
+      }
+
+      .button-group {
+        display: flex;
+        gap: 1rem;
+        flex-direction: column;
+      }
+
+      button {
+        padding: 0.75rem 1.5rem;
+        border-radius: 0.5rem;
+        border: none;
+        font-size: 1rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s ease;
+      }
+
+      .btn-primary {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        text-decoration: none;
+        display: inline-block;
+      }
+
+      .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+      }
+
+      .btn-secondary {
+        background: white;
+        color: #667eea;
+        border: 2px solid #667eea;
+      }
+
+      .btn-secondary:hover {
+        background: #f0f4ff;
+      }
+
+      .status-indicator {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.875rem;
+        margin-top: 1.5rem;
+        padding-top: 1.5rem;
+        border-top: 1px solid #e5e7eb;
+        color: #9ca3af;
+      }
+
+      .status-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #ef4444;
+        animation: pulse 2s infinite;
+      }
+
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.5;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .status-dot {
+          animation: none;
+        }
+      }
+
+      @media (max-width: 640px) {
+        .offline-container {
+          padding: 1.5rem;
+        }
+
+        h1 {
+          font-size: 1.5rem;
+        }
+
+        p {
+          font-size: 0.9375rem;
+        }
+
+        .button-group {
+          flex-direction: column;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="offline-container">
+      <svg
+        class="offline-icon"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <circle cx="12" cy="12" r="10" stroke="#667eea"></circle>
+        <path d="M12 6v6l4 2" stroke="#667eea"></path>
+        <line
+          x1="5.07"
+          y1="5.07"
+          x2="6.48"
+          y2="6.48"
+          stroke="#ef4444"
+          stroke-width="2"
+        ></line>
+      </svg>
+
+      <div class="offline-status">You are Offline</div>
+      <h1>Connection Lost</h1>
+
+      <p>
+        Don't worry! Nova Launch is designed to work offline. Here's what you
+        can still do:
+      </p>
+
+      <ul>
+        <li>View previously loaded content</li>
+        <li>Prepare transactions offline</li>
+        <li>Review token configurations</li>
+        <li>Check stored wallet information</li>
+      </ul>
+
+      <div class="button-group">
+        <button class="btn-primary" onclick="goHome()">Go to Home</button>
+        <button class="btn-secondary" onclick="retry()">
+          Retry Connection
+        </button>
+      </div>
+
+      <div class="status-indicator">
+        <span class="status-dot"></span>
+        <span id="connectionStatus">Waiting for connection...</span>
+      </div>
+    </div>
+
+    <script>
+      function goHome() {
+        window.location.href = "/";
+      }
+
+      function retry() {
+        window.location.reload();
+      }
+
+      // Monitor connection status
+      window.addEventListener("online", () => {
+        const status = document.getElementById("connectionStatus");
+        if (status) {
+          status.textContent = "Connection restored!";
+          setTimeout(() => {
+            window.location.href = "/";
+          }, 1000);
+        }
+      });
+
+      window.addEventListener("offline", () => {
+        const status = document.getElementById("connectionStatus");
+        if (status) {
+          status.textContent = "No connection";
+        }
+      });
+
+      // Check initial connection status
+      if (navigator.onLine) {
+        goHome();
+      }
+    </script>
+  </body>
+</html>

@@ -1,5 +1,7 @@
 import type { AppError } from '../types';
 import { ErrorCode } from '../types';
+import { LoggingService } from '../services/logging';
+import type { ErrorContext } from '../services/logging';
 
 /**
  * Error handling utilities
@@ -13,7 +15,154 @@ export const ERROR_MESSAGES: Record<ErrorCode, string> = {
     [ErrorCode.TRANSACTION_FAILED]: 'Transaction failed. Please try again',
     [ErrorCode.WALLET_REJECTED]: 'Transaction was cancelled',
     [ErrorCode.NETWORK_ERROR]: 'Network error. Please check your connection',
+    [ErrorCode.SIMULATION_FAILED]: 'Transaction simulation failed',
+    [ErrorCode.CONTRACT_ERROR]: 'Smart contract error occurred',
+    [ErrorCode.TIMEOUT_ERROR]: 'Transaction confirmation timeout',
+    [ErrorCode.ACCOUNT_NOT_FOUND]: 'Account not found on network',
+    [ErrorCode.INVALID_SIGNATURE]: 'Invalid transaction signature',
 };
+
+export const ERROR_RECOVERY_SUGGESTIONS: Record<ErrorCode, string> = {
+    [ErrorCode.WALLET_NOT_CONNECTED]: 'Open Freighter and reconnect your wallet.',
+    [ErrorCode.INSUFFICIENT_BALANCE]: 'Fund your wallet with enough XLM, then retry.',
+    [ErrorCode.INVALID_INPUT]: 'Review all fields and fix validation errors.',
+    [ErrorCode.IPFS_UPLOAD_FAILED]: 'Retry upload or use a smaller image file.',
+    [ErrorCode.TRANSACTION_FAILED]: 'Retry in a moment and confirm transaction details.',
+    [ErrorCode.WALLET_REJECTED]: 'Approve the transaction in your wallet prompt.',
+    [ErrorCode.NETWORK_ERROR]: 'Check connectivity and try again.',
+    [ErrorCode.SIMULATION_FAILED]: 'Update token params and retry simulation.',
+    [ErrorCode.CONTRACT_ERROR]: 'Verify contract/network configuration and retry.',
+    [ErrorCode.TIMEOUT_ERROR]: 'Wait briefly and check transaction status again.',
+    [ErrorCode.ACCOUNT_NOT_FOUND]: 'Fund/activate your account on the selected network.',
+    [ErrorCode.INVALID_SIGNATURE]: 'Re-sign with the connected wallet and retry.',
+};
+
+export type ErrorSeverity = 'low' | 'medium' | 'high';
+
+export interface HandledError extends AppError {
+    severity: ErrorSeverity;
+    recoverySuggestion: string;
+}
+
+let globalErrorListenersAttached = false;
+
+export class ErrorHandler {
+    static handle(error: Error, context?: ErrorContext): void {
+        const severity = this.resolveSeverity(error);
+        this.log(error, severity, context);
+        this.report(error, context);
+    }
+
+    static log(error: Error, severity: ErrorSeverity, context?: ErrorContext): void {
+        LoggingService.logError(error, severity, context);
+    }
+
+    static report(error: Error, context?: ErrorContext): void {
+        LoggingService.reportToMonitoring(error, context);
+    }
+
+    static getUserMessage(error: Error): string {
+        const appError = this.toAppError(error);
+        return appError.details ? `${appError.message}: ${appError.details}` : appError.message;
+    }
+
+    static getRecoverySuggestion(error: Error): string {
+        const appError = this.toAppError(error);
+        return (ERROR_RECOVERY_SUGGESTIONS as Record<string, string>)[appError.code] || 'Please try again.';
+    }
+
+    static toHandledError(error: unknown): HandledError {
+        const normalizedError = toNativeError(error);
+        const appError = this.toAppError(normalizedError);
+
+        return {
+            ...appError,
+            severity: this.resolveSeverity(normalizedError),
+            recoverySuggestion: this.getRecoverySuggestion(normalizedError),
+        };
+    }
+
+    private static toAppError(error: Error): AppError {
+        const loweredMessage = error.message.toLowerCase();
+
+        if (loweredMessage.includes('wallet') && loweredMessage.includes('connect')) {
+            return createError(ErrorCode.WALLET_NOT_CONNECTED, error.message);
+        }
+
+        if (loweredMessage.includes('insufficient') || loweredMessage.includes('balance')) {
+            return createError(ErrorCode.INSUFFICIENT_BALANCE, error.message);
+        }
+
+        if (loweredMessage.includes('network') || loweredMessage.includes('fetch')) {
+            return createError(ErrorCode.NETWORK_ERROR, error.message);
+        }
+
+        if (loweredMessage.includes('timeout')) {
+            return createError(ErrorCode.TIMEOUT_ERROR, error.message);
+        }
+
+        if (loweredMessage.includes('reject') || loweredMessage.includes('decline')) {
+            return createError(ErrorCode.WALLET_REJECTED, error.message);
+        }
+
+        if (loweredMessage.includes('simulation')) {
+            return createError(ErrorCode.SIMULATION_FAILED, error.message);
+        }
+
+        if (loweredMessage.includes('ipfs')) {
+            return createError(ErrorCode.IPFS_UPLOAD_FAILED, error.message);
+        }
+
+        return createError(ErrorCode.TRANSACTION_FAILED, error.message);
+    }
+
+    private static resolveSeverity(error: Error): ErrorSeverity {
+        const loweredMessage = error.message.toLowerCase();
+
+        if (loweredMessage.includes('timeout') || loweredMessage.includes('network')) {
+            return 'medium';
+        }
+
+        if (loweredMessage.includes('failed') || loweredMessage.includes('critical')) {
+            return 'high';
+        }
+
+        return 'low';
+    }
+}
+
+export function setupGlobalErrorHandling(): void {
+    if (globalErrorListenersAttached || typeof window === 'undefined') {
+        return;
+    }
+
+    globalErrorListenersAttached = true;
+    LoggingService.init();
+
+    window.addEventListener('error', (event) => {
+        const error = event.error instanceof Error
+            ? event.error
+            : new Error(event.message || 'Unhandled script error');
+
+        ErrorHandler.handle(error, {
+            action: 'window.error',
+            feature: 'global-runtime',
+            metadata: {
+                filename: event.filename,
+                line: event.lineno,
+                column: event.colno,
+            },
+        });
+    });
+
+    window.addEventListener('unhandledrejection', (event) => {
+        const error = toNativeError(event.reason);
+        ErrorHandler.handle(error, {
+            action: 'window.unhandledrejection',
+            feature: 'global-runtime',
+        });
+    });
+}
 
 export function createError(code: ErrorCode, details?: string): AppError {
     return {
@@ -33,14 +182,19 @@ export function isAppError(error: unknown): error is AppError {
 }
 
 export function getErrorMessage(error: unknown): string {
+    const nativeError = toNativeError(error);
+    return ErrorHandler.getUserMessage(nativeError);
+}
+
+function toNativeError(error: unknown): Error {
     if (isAppError(error)) {
-        return error.details ? `${error.message}: ${error.details}` : error.message;
+        return new Error(error.details ? `${error.message}: ${error.details}` : error.message);
     }
     if (error instanceof Error) {
-        return error.message;
-    }
-    if (typeof error === 'string') {
         return error;
     }
-    return 'An unknown error occurred';
+    if (typeof error === 'string') {
+        return new Error(error);
+    }
+    return new Error('An unknown error occurred');
 }

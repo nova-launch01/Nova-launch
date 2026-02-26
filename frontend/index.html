@@ -3,10 +3,60 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Nova Launch</title>
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+    />
+    
+    <!-- SEO Meta Tags -->
+    <title>NovaLaunch – No-Code Token Launchpad on Stellar</title>
+    <meta name="description" content="Deploy tokens on Stellar in minutes without code. Premium, secure, and effortless token deployment." />
+    <meta name="keywords" content="Stellar, token, launchpad, no-code, cryptocurrency, blockchain, deploy token, Stellar token deployment" />
+    <meta name="author" content="NovaLaunch" />
+    <meta name="robots" content="index, follow" />
+    <link rel="canonical" href="https://novalaunch.com" />
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://novalaunch.com/" />
+    <meta property="og:title" content="NovaLaunch – No-Code Token Launchpad on Stellar" />
+    <meta property="og:description" content="Deploy tokens on Stellar in minutes without code. Premium, secure, and effortless token deployment." />
+    <meta property="og:image" content="/og-image.png" />
+    <meta property="og:site_name" content="NovaLaunch" />
+    
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:url" content="https://novalaunch.com/" />
+    <meta name="twitter:title" content="NovaLaunch – No-Code Token Launchpad on Stellar" />
+    <meta name="twitter:description" content="Deploy tokens on Stellar in minutes without code. Premium, secure, and effortless token deployment." />
+    <meta name="twitter:image" content="/og-image.png" />
+    
+    <!-- Performance Optimization -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Asimovian&display=swap" />
+    <link rel="dns-prefetch" href="https://fonts.googleapis.com" />
+    
+    <!-- PWA Meta Tags -->
+    <meta name="theme-color" content="#FF3B2E" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta
+      name="apple-mobile-web-app-status-bar-style"
+      content="black-translucent"
+    />
+    <meta name="apple-mobile-web-app-title" content="Nova Launch" />
+    <link rel="apple-touch-icon" href="/icon-192.svg" />
+    <link rel="manifest" href="/manifest.json" />
+    
+    <!-- Preload Critical Assets -->
+    <link rel="modulepreload" href="/src/main.tsx" />
   </head>
   <body>
+    <!-- Skip to main content link for accessibility -->
+    <a href="#main-content" className="skip-to-main">
+      Skip to main content
+    </a>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
