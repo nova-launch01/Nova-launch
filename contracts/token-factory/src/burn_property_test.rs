@@ -39,7 +39,6 @@ mod property_tests {
             &String::from_str(env, "TEST"),
             &7u32,
             &initial_supply,
-            &None,
             &70_000_000,
         );
         0 // First token has index 0

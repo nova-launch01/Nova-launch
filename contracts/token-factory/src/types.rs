@@ -246,6 +246,11 @@ pub enum Error {
     InvalidMaxSupply = 18,
     WithdrawalCapExceeded = 19,
     RecipientNotAllowed = 20,
+    MissingAdmin = 21,
+    MissingTreasury = 22,
+    InvalidBaseFee = 23,
+    InvalidMetadataFee = 24,
+    InconsistentTokenCount = 25,
 }
 
 /// Timelock configuration
@@ -310,11 +315,11 @@ pub struct PendingChange {
 /// Uses token index as the cursor for deterministic ordering.
 ///
 /// # Fields
-/// * `next_index` - The next token index to fetch (None = end of results)
+/// * `next_index` - The next token index to fetch (u32::MAX = end of results)
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PaginationCursor {
-    pub next_index: Option<u32>,
+    pub next_index: u32,
 }
 
 /// Paginated token result
@@ -328,7 +333,7 @@ pub struct PaginationCursor {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PaginatedTokens {
     pub tokens: soroban_sdk::Vec<TokenInfo>,
-    pub cursor: Option<PaginationCursor>,
+    pub cursor: Option<u32>,
 }
 
 /// Treasury withdrawal policy

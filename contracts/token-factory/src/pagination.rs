@@ -1,5 +1,5 @@
 use soroban_sdk::{Address, Env, Vec};
-use crate::types::{Error, PaginatedTokens, PaginationCursor, TokenInfo};
+use crate::types::{Error, PaginatedTokens, TokenInfo};
 use crate::storage;
 
 /// Maximum number of tokens per page
@@ -43,7 +43,7 @@ const DEFAULT_PAGE_SIZE: u32 = 20;
 pub fn get_tokens_by_creator(
     env: &Env,
     creator: &Address,
-    cursor: Option<PaginationCursor>,
+    cursor: Option<u32>,
     limit: Option<u32>,
 ) -> Result<PaginatedTokens, Error> {
     // Validate and cap limit
@@ -56,10 +56,7 @@ pub fn get_tokens_by_creator(
     let creator_tokens = storage::get_creator_tokens(env, creator);
     
     // Determine starting position
-    let start_pos = cursor
-        .as_ref()
-        .and_then(|c| c.next_index)
-        .unwrap_or(0);
+    let start_pos = cursor.unwrap_or(0);
     
     // Check if we're past the end
     if start_pos >= creator_tokens.len() {
@@ -87,9 +84,7 @@ pub fn get_tokens_by_creator(
     
     // Determine next cursor
     let next_cursor = if current_pos < creator_tokens.len() {
-        Some(PaginationCursor {
-            next_index: Some(current_pos),
-        })
+        Some(current_pos)
     } else {
         None
     };
@@ -237,9 +232,7 @@ mod tests {
         let (env, creator) = setup_with_tokens(10);
         
         // Create cursor past the end
-        let invalid_cursor = PaginationCursor {
-            next_index: Some(100),
-        };
+        let invalid_cursor = 100u32;
         
         let result = get_tokens_by_creator(&env, &creator, Some(invalid_cursor), Some(20)).unwrap();
         
@@ -314,6 +307,7 @@ mod tests {
                 decimals: 7,
                 total_supply: 1_000_000,
                 initial_supply: 1_000_000,
+                max_supply: None,
                 total_burned: 0,
                 burn_count: 0,
                 metadata_uri: None,
@@ -334,6 +328,7 @@ mod tests {
                 decimals: 7,
                 total_supply: 2_000_000,
                 initial_supply: 2_000_000,
+                max_supply: None,
                 total_burned: 0,
                 burn_count: 0,
                 metadata_uri: None,

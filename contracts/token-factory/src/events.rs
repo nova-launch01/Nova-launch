@@ -270,7 +270,7 @@ pub fn emit_timelock_configured(env: &Env, delay_seconds: u64) {
 /// Emit change scheduled event
 ///
 /// Emitted when a sensitive change is scheduled with timelock
-pub fn emit_change_scheduled(env: &Env, change_id: u64, change_type: &crate::types::ChangeType, execute_at: u64) {
+pub fn emit_change_scheduled(env: &Env, change_id: u64, change_type: crate::types::ChangeType, execute_at: u64) {
     env.events().publish(
         (symbol_short!("ch_sched"), change_id),
         (change_type, execute_at),
@@ -280,7 +280,7 @@ pub fn emit_change_scheduled(env: &Env, change_id: u64, change_type: &crate::typ
 /// Emit change executed event
 ///
 /// Emitted when a pending change is successfully executed
-pub fn emit_change_executed(env: &Env, change_id: u64, change_type: &crate::types::ChangeType) {
+pub fn emit_change_executed(env: &Env, change_id: u64, change_type: crate::types::ChangeType) {
     env.events().publish(
         (symbol_short!("ch_exec"), change_id),
         (change_type,),
@@ -290,7 +290,7 @@ pub fn emit_change_executed(env: &Env, change_id: u64, change_type: &crate::type
 /// Emit change cancelled event
 ///
 /// Emitted when a pending change is cancelled before execution
-pub fn emit_change_cancelled(env: &Env, change_id: u64, change_type: &crate::types::ChangeType) {
+pub fn emit_change_cancelled(env: &Env, change_id: u64, change_type: crate::types::ChangeType) {
     env.events().publish(
         (symbol_short!("ch_cncl"), change_id),
         (change_type,),

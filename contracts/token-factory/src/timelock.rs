@@ -105,7 +105,7 @@ pub fn schedule_fee_update(
     };
     
     storage::set_pending_change(env, change_id, &pending_change);
-    events::emit_change_scheduled(env, change_id, &ChangeType::FeeUpdate, execute_at);
+    events::emit_change_scheduled(env, change_id, ChangeType::FeeUpdate, execute_at);
     
     Ok(change_id)
 }
@@ -156,7 +156,7 @@ pub fn schedule_pause_update(
     };
     
     storage::set_pending_change(env, change_id, &pending_change);
-    events::emit_change_scheduled(env, change_id, &ChangeType::PauseUpdate, execute_at);
+    events::emit_change_scheduled(env, change_id, ChangeType::PauseUpdate, execute_at);
     
     Ok(change_id)
 }
@@ -207,7 +207,7 @@ pub fn schedule_treasury_update(
     };
     
     storage::set_pending_change(env, change_id, &pending_change);
-    events::emit_change_scheduled(env, change_id, &ChangeType::TreasuryUpdate, execute_at);
+    events::emit_change_scheduled(env, change_id, ChangeType::TreasuryUpdate, execute_at);
     
     Ok(change_id)
 }
@@ -274,7 +274,7 @@ pub fn execute_change(env: &Env, change_id: u64) -> Result<(), Error> {
     pending_change.executed = true;
     storage::set_pending_change(env, change_id, &pending_change);
     
-    events::emit_change_executed(env, change_id, &pending_change.change_type);
+    events::emit_change_executed(env, change_id, pending_change.change_type);
     
     Ok(())
 }
@@ -309,7 +309,7 @@ pub fn cancel_change(env: &Env, admin: &Address, change_id: u64) -> Result<(), E
     }
     
     storage::remove_pending_change(env, change_id);
-    events::emit_change_cancelled(env, change_id, &pending_change.change_type);
+    events::emit_change_cancelled(env, change_id, pending_change.change_type);
     
     Ok(())
 }
@@ -345,6 +345,7 @@ pub fn get_timelock_config(env: &Env) -> TimelockConfig {
 mod tests {
     use super::*;
     use soroban_sdk::{testutils::Address as _, Env};
+    use soroban_sdk::testutils::Ledger;
     
     fn setup() -> (Env, Address) {
         let env = Env::default();
