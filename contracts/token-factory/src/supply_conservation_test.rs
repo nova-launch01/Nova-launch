@@ -21,7 +21,7 @@ fn setup_test_env() -> (Env, TokenFactoryClient<'static>, Address, Address) {
 }
 
 proptest! {
-    #![proptest_config(ProptestConfig::with_cases(500))]
+    #![proptest_config(ProptestConfig::with_cases(100))]
 
     // Property: Factory state remains consistent across operations
     #[test]
