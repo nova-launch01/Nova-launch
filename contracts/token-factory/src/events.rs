@@ -317,3 +317,46 @@ pub fn emit_mint(env: &Env, token_index: u32, to: &Address, amount: i128) {
         (to, amount),
     );
 }
+
+
+// ── Treasury events ─────────────────────────────────────────
+
+/// Emit treasury withdrawal event
+///
+/// Emitted when fees are withdrawn from treasury
+pub fn emit_treasury_withdrawal(env: &Env, recipient: &Address, amount: i128) {
+    env.events().publish(
+        (symbol_short!("trs_wdrw"),),
+        (recipient, amount),
+    );
+}
+
+/// Emit recipient added event
+///
+/// Emitted when an address is added to the withdrawal allowlist
+pub fn emit_recipient_added(env: &Env, recipient: &Address) {
+    env.events().publish(
+        (symbol_short!("rec_add"),),
+        (recipient,),
+    );
+}
+
+/// Emit recipient removed event
+///
+/// Emitted when an address is removed from the withdrawal allowlist
+pub fn emit_recipient_removed(env: &Env, recipient: &Address) {
+    env.events().publish(
+        (symbol_short!("rec_rem"),),
+        (recipient,),
+    );
+}
+
+/// Emit treasury policy updated event
+///
+/// Emitted when treasury withdrawal policy is changed
+pub fn emit_treasury_policy_updated(env: &Env, daily_cap: i128, allowlist_enabled: bool) {
+    env.events().publish(
+        (symbol_short!("trs_pol"),),
+        (daily_cap, allowlist_enabled),
+    );
+}

@@ -9,6 +9,7 @@ mod validation;
 mod timelock;
 mod pagination;
 mod mint;
+mod treasury;
 
 use soroban_sdk::{contract, contractimpl, Address, Env, String};
 use types::{ContractMetadata, Error, FactoryState, TokenInfo};
@@ -1023,6 +1024,231 @@ impl TokenFactory {
         mint::get_remaining_mintable(&env, token_index)
     }
 
+    // ═══════════════════════════════════════════════════════════════════════
+    // Treasury Functions
+    // ═══════════════════════════════════════════════════════════════════════
+
+    /// Initialize treasury policy
+    ///
+    /// Sets up withdrawal limits and controls for the treasury.
+    /// Should be called during contract initialization or when first
+    /// configuring treasury protections.
+    ///
+    /// # Arguments
+    /// * `env` - The contract environment
+    /// * `admin` - Admin address (must authorize)
+    /// * `daily_cap` - Optional maximum withdrawal per day in stroops (None = default 100 XLM)
+    /// * `allowlist_enabled` - Whether to enforce recipient allowlist
+    ///
+    /// # Returns
+    /// Returns `Ok(())` on success
+    ///
+    /// # Errors
+    /// * `Error::Unauthorized` - Caller is not the admin
+    /// * `Error::InvalidParameters` - Daily cap is negative
+    ///
+    /// # Examples
+    /// ```
+    /// // 100 XLM daily cap with allowlist
+    /// factory.initialize_treasury_policy(&env, admin, Some(100_0000000), true)?;
+    /// ```
+    pub fn initialize_treasury_policy(
+        env: Env,
+        admin: Address,
+        daily_cap: Option<i128>,
+        allowlist_enabled: bool,
+    ) -> Result<(), Error> {
+        admin.require_auth();
+        
+        let current_admin = storage::get_admin(&env);
+        if admin != current_admin {
+            return Err(Error::Unauthorized);
+        }
+        
+        treasury::initialize_treasury_policy(&env, daily_cap, allowlist_enabled)
+    }
+
+    /// Withdraw fees from treasury
+    ///
+    /// Transfers accumulated fees to a recipient address.
+    /// Enforces withdrawal policy limits and allowlist.
+    ///
+    /// # Arguments
+    /// * `env` - The contract environment
+    /// * `admin` - Admin address (must authorize)
+    /// * `recipient` - Address to receive the funds
+    /// * `amount` - Amount to withdraw in stroops
+    ///
+    /// # Returns
+    /// Returns `Ok(())` on success
+    ///
+    /// # Errors
+    /// * `Error::Unauthorized` - Caller is not admin
+    /// * `Error::WithdrawalCapExceeded` - Exceeds daily cap
+    /// * `Error::RecipientNotAllowed` - Recipient not in allowlist
+    /// * `Error::InvalidAmount` - Amount is zero or negative
+    ///
+    /// # Examples
+    /// ```
+    /// // Withdraw 50 XLM to recipient
+    /// factory.withdraw_fees(&env, admin, recipient, 50_0000000)?;
+    /// ```
+    pub fn withdraw_fees(
+        env: Env,
+        admin: Address,
+        recipient: Address,
+        amount: i128,
+    ) -> Result<(), Error> {
+        treasury::withdraw_fees(&env, &admin, &recipient, amount)
+    }
+
+    /// Add recipient to allowlist
+    ///
+    /// Allows an address to receive treasury withdrawals.
+    /// Only admin can modify the allowlist.
+    ///
+    /// # Arguments
+    /// * `env` - The contract environment
+    /// * `admin` - Admin address (must authorize)
+    /// * `recipient` - Address to add to allowlist
+    ///
+    /// # Returns
+    /// Returns `Ok(())` on success
+    ///
+    /// # Errors
+    /// * `Error::Unauthorized` - Caller is not the admin
+    ///
+    /// # Examples
+    /// ```
+    /// factory.add_allowed_recipient(&env, admin, recipient)?;
+    /// ```
+    pub fn add_allowed_recipient(
+        env: Env,
+        admin: Address,
+        recipient: Address,
+    ) -> Result<(), Error> {
+        treasury::add_allowed_recipient(&env, &admin, &recipient)
+    }
+
+    /// Remove recipient from allowlist
+    ///
+    /// Revokes an address's ability to receive treasury withdrawals.
+    /// Only admin can modify the allowlist.
+    ///
+    /// # Arguments
+    /// * `env` - The contract environment
+    /// * `admin` - Admin address (must authorize)
+    /// * `recipient` - Address to remove from allowlist
+    ///
+    /// # Returns
+    /// Returns `Ok(())` on success
+    ///
+    /// # Errors
+    /// * `Error::Unauthorized` - Caller is not the admin
+    ///
+    /// # Examples
+    /// ```
+    /// factory.remove_allowed_recipient(&env, admin, recipient)?;
+    /// ```
+    pub fn remove_allowed_recipient(
+        env: Env,
+        admin: Address,
+        recipient: Address,
+    ) -> Result<(), Error> {
+        treasury::remove_allowed_recipient(&env, &admin, &recipient)
+    }
+
+    /// Update treasury policy
+    ///
+    /// Changes the withdrawal limits and allowlist settings.
+    /// Only admin can update the policy.
+    ///
+    /// # Arguments
+    /// * `env` - The contract environment
+    /// * `admin` - Admin address (must authorize)
+    /// * `daily_cap` - Optional new daily cap in stroops (None = no change)
+    /// * `allowlist_enabled` - Optional new allowlist setting (None = no change)
+    ///
+    /// # Returns
+    /// Returns `Ok(())` on success
+    ///
+    /// # Errors
+    /// * `Error::Unauthorized` - Caller is not the admin
+    /// * `Error::InvalidParameters` - Daily cap is negative
+    ///
+    /// # Examples
+    /// ```
+    /// // Update daily cap to 200 XLM
+    /// factory.update_treasury_policy(&env, admin, Some(200_0000000), None)?;
+    /// ```
+    pub fn update_treasury_policy(
+        env: Env,
+        admin: Address,
+        daily_cap: Option<i128>,
+        allowlist_enabled: Option<bool>,
+    ) -> Result<(), Error> {
+        treasury::update_treasury_policy(&env, &admin, daily_cap, allowlist_enabled)
+    }
+
+    /// Get remaining withdrawal capacity for current period
+    ///
+    /// Returns how much more can be withdrawn before hitting the daily cap.
+    ///
+    /// # Arguments
+    /// * `env` - The contract environment
+    ///
+    /// # Returns
+    /// Remaining withdrawal capacity in stroops
+    ///
+    /// # Examples
+    /// ```
+    /// let remaining = factory.get_remaining_capacity(&env);
+    /// log!("Can withdraw {} more stroops today", remaining);
+    /// ```
+    pub fn get_remaining_capacity(env: Env) -> i128 {
+        treasury::get_remaining_capacity(&env)
+    }
+
+    /// Get treasury policy
+    ///
+    /// Returns the current withdrawal policy settings.
+    ///
+    /// # Arguments
+    /// * `env` - The contract environment
+    ///
+    /// # Returns
+    /// Current treasury policy
+    ///
+    /// # Examples
+    /// ```
+    /// let policy = factory.get_treasury_policy(&env);
+    /// log!("Daily cap: {}", policy.daily_cap);
+    /// ```
+    pub fn get_treasury_policy(env: Env) -> types::TreasuryPolicy {
+        treasury::get_treasury_policy(&env)
+    }
+
+    /// Check if address is allowed recipient
+    ///
+    /// Returns true if the address can receive treasury withdrawals.
+    ///
+    /// # Arguments
+    /// * `env` - The contract environment
+    /// * `recipient` - Address to check
+    ///
+    /// # Returns
+    /// True if address is in allowlist or allowlist is disabled
+    ///
+    /// # Examples
+    /// ```
+    /// if factory.is_allowed_recipient(&env, recipient) {
+    ///     log!("Recipient is allowed");
+    /// }
+    /// ```
+    pub fn is_allowed_recipient(env: Env, recipient: Address) -> bool {
+        treasury::is_allowed_recipient(&env, &recipient)
+    }
+
 }
 
 // Temporarily disabled - requires create_token implementation
@@ -1089,3 +1315,6 @@ mod timelock_test;
 
 #[cfg(test)]
 mod pagination_integration_test;
+
+#[cfg(test)]
+mod treasury_integration_test;

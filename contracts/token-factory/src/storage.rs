@@ -747,3 +747,58 @@ pub fn get_creator_token_count(env: &Env, creator: &Address) -> u32 {
         .get(&DataKey::CreatorTokenCount(creator.clone()))
         .unwrap_or(0)
 }
+
+
+// ── Treasury storage functions ─────────────────────────────
+
+/// Get treasury withdrawal policy
+pub fn get_treasury_policy(env: &Env) -> crate::types::TreasuryPolicy {
+    env.storage()
+        .instance()
+        .get(&DataKey::TreasuryPolicy)
+        .unwrap_or(crate::types::TreasuryPolicy {
+            daily_cap: 100_0000000, // 100 XLM default
+            allowlist_enabled: false,
+            period_duration: 86_400, // 24 hours
+        })
+}
+
+/// Set treasury withdrawal policy
+pub fn set_treasury_policy(env: &Env, policy: &crate::types::TreasuryPolicy) {
+    env.storage()
+        .instance()
+        .set(&DataKey::TreasuryPolicy, policy);
+}
+
+/// Get current withdrawal period
+pub fn get_withdrawal_period(env: &Env) -> crate::types::WithdrawalPeriod {
+    env.storage()
+        .instance()
+        .get(&DataKey::WithdrawalPeriod)
+        .unwrap_or(crate::types::WithdrawalPeriod {
+            period_start: env.ledger().timestamp(),
+            amount_withdrawn: 0,
+        })
+}
+
+/// Set withdrawal period
+pub fn set_withdrawal_period(env: &Env, period: &crate::types::WithdrawalPeriod) {
+    env.storage()
+        .instance()
+        .set(&DataKey::WithdrawalPeriod, period);
+}
+
+/// Check if address is allowed recipient
+pub fn is_allowed_recipient(env: &Env, recipient: &Address) -> bool {
+    env.storage()
+        .persistent()
+        .get(&DataKey::AllowedRecipient(recipient.clone()))
+        .unwrap_or(false)
+}
+
+/// Set allowed recipient status
+pub fn set_allowed_recipient(env: &Env, recipient: &Address, allowed: bool) {
+    env.storage()
+        .persistent()
+        .set(&DataKey::AllowedRecipient(recipient.clone()), &allowed);
+}

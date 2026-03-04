@@ -130,6 +130,9 @@ pub struct FeeUpdate {
 /// * `NextChangeId` - Next available change ID
 /// * `CreatorTokens(Address)` - Vector of token indices for a creator
 /// * `CreatorTokenCount(Address)` - Number of tokens created by address
+/// * `TreasuryPolicy` - Treasury withdrawal policy
+/// * `WithdrawalPeriod` - Current withdrawal period tracking
+/// * `AllowedRecipient(Address)` - Whether address is allowed recipient
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum DataKey {
@@ -148,6 +151,9 @@ pub enum DataKey {
     NextChangeId,
     CreatorTokens(Address),
     CreatorTokenCount(Address),
+    TreasuryPolicy,
+    WithdrawalPeriod,
+    AllowedRecipient(Address),
 }
 
 /// Contract error codes
@@ -174,6 +180,8 @@ pub enum DataKey {
 /// * `ChangeAlreadyExecuted` - Change has already been executed
 /// * `MaxSupplyExceeded` - Minting would exceed max supply cap
 /// * `InvalidMaxSupply` - Max supply is less than initial supply
+/// * `WithdrawalCapExceeded` - Withdrawal would exceed daily cap
+/// * `RecipientNotAllowed` - Recipient not in allowlist
 ///
 /// # Examples
 /// ```
@@ -202,6 +210,8 @@ pub enum Error {
     ChangeAlreadyExecuted = 16,
     MaxSupplyExceeded = 17,
     InvalidMaxSupply = 18,
+    WithdrawalCapExceeded = 19,
+    RecipientNotAllowed = 20,
 }
 
 /// Timelock configuration
@@ -285,4 +295,34 @@ pub struct PaginationCursor {
 pub struct PaginatedTokens {
     pub tokens: soroban_sdk::Vec<TokenInfo>,
     pub cursor: Option<PaginationCursor>,
+}
+
+/// Treasury withdrawal policy
+///
+/// Defines limits and controls for treasury withdrawals.
+///
+/// # Fields
+/// * `daily_cap` - Maximum amount that can be withdrawn per day (in stroops)
+/// * `allowlist_enabled` - Whether recipient allowlist is enforced
+/// * `period_duration` - Duration of withdrawal period in seconds (default 86400 = 1 day)
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TreasuryPolicy {
+    pub daily_cap: i128,
+    pub allowlist_enabled: bool,
+    pub period_duration: u64,
+}
+
+/// Treasury withdrawal tracking for current period
+///
+/// Tracks withdrawals within the current time period.
+///
+/// # Fields
+/// * `period_start` - Timestamp when current period started
+/// * `amount_withdrawn` - Total amount withdrawn in current period
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct WithdrawalPeriod {
+    pub period_start: u64,
+    pub amount_withdrawn: i128,
 }
