@@ -384,7 +384,7 @@ pub fn emit_stream_metadata_updated(
     has_metadata: bool,
 ) {
     env.events().publish(
-        (symbol_short!("strm_md_v1"), stream_id),
+        (symbol_short!("stm_md_v1"), stream_id),
         (updater, has_metadata),
     );
 }
@@ -392,10 +392,10 @@ pub fn emit_stream_metadata_updated(
 /// Emit stream created event (v1)
 /// 
 /// **Schema Version**: 1
-/// **Event Name**: strm_crt_v1
+/// **Event Name**: stm_cr_v1
 /// 
 /// **Topics** (indexed):
-/// - Event name: "strm_crt_v1"
+/// - Event name: "stm_cr_v1"
 /// - stream_id: u32 - The newly created stream ID
 /// 
 /// **Payload** (non-indexed):
@@ -416,7 +416,7 @@ pub fn emit_stream_created(
     has_metadata: bool,
 ) {
     env.events().publish(
-        (symbol_short!("strm_crt_v1"), stream_id),
+        (symbol_short!("stm_cr_v1"), stream_id),
         (creator, recipient, amount, has_metadata),
     );
 }

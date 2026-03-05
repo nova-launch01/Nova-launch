@@ -61,7 +61,7 @@ pub struct ContractMetadata {
 /// * `total_burned` - Cumulative amount of tokens burned
 /// * `burn_count` - Number of burn operations performed
 /// * `metadata_uri` - Optional IPFS URI for additional metadata
-/// * `created_at` - Unix timestamp of token creation
+/// * `is_paused` - Token-level pause flag
 /// * `clawback_enabled` - Whether admin can burn from any address
 ///
 /// # Examples
@@ -84,8 +84,8 @@ pub struct TokenInfo {
     pub burn_count: u32,
     pub metadata_uri: Option<String>,
     pub created_at: u64,
-    pub is_paused: bool,   // NEW — token-level pause flag
     pub is_paused: bool,
+    pub clawback_enabled: bool,
 }
 
 /// Compact read-only snapshot of a token's current state.
@@ -93,13 +93,11 @@ pub struct TokenInfo {
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TokenStats {
-    pub current_supply: i128,  // live circulating supply
-    pub total_burned:   i128,  // cumulative amount burned since creation
-    pub burn_count:     u32,   // number of burn operations performed
-    pub is_paused:      bool,  // token-level pause flag
-    pub has_clawback:   bool,  // clawback policy flag (reserved; always false for now)
+    pub current_supply: i128,
     pub total_burned: i128,
     pub burn_count: u32,
+    pub is_paused: bool,
+    pub has_clawback: bool,
     pub clawback_enabled: bool,
     pub freeze_enabled: bool,
 }
@@ -163,9 +161,8 @@ pub enum DataKey {
     Token(u32),
     Balance(u32, Address),
     BurnCount(u32),
-    TokenPaused(u32),      // NEW — token_index -> bool
     TokenPaused(u32),
-    TotalBurned(u32),   // NEW — cumulative burned amount per token
+    TotalBurned(u32),
     TokenByAddress(Address),
     Paused,
     TimelockConfig,
@@ -176,10 +173,9 @@ pub enum DataKey {
     TreasuryPolicy,
     WithdrawalPeriod,
     AllowedRecipient(Address),
-    // Stream management keys
-    StreamCount,                    // Total number of streams created
-    Stream(u32),                    // Stream info by ID
-    StreamByCreator(Address, u32),  // Index streams by creator for pagination
+    StreamCount,
+    Stream(u32),
+    StreamByCreator(Address, u32),
 }
 
 /// Contract error codes

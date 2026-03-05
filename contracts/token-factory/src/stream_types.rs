@@ -1,16 +1,45 @@
 use soroban_sdk::{contracttype, Address, String};
 use crate::types::Error;
 
-/// Stream information with optional metadata
+/// Stream schedule defining vesting timeline
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct StreamSchedule {
+    pub start_time: u64,
+    pub cliff_time: u64,
+    pub end_time: u64,
+}
+
+/// Stream information with schedule and metadata
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct StreamInfo {
     pub id: u32,
     pub creator: Address,
     pub recipient: Address,
+    pub token_address: Address,
     pub amount: i128,
+    pub schedule: StreamSchedule,
+    pub claimed: i128,
+    pub cancelled: bool,
     pub metadata: Option<String>,
     pub created_at: u64,
+}
+
+/// Validate stream schedule ordering
+pub fn validate_schedule(schedule: &StreamSchedule) -> Result<(), Error> {
+    if schedule.start_time > schedule.cliff_time || schedule.cliff_time > schedule.end_time {
+        return Err(Error::InvalidSchedule);
+    }
+    Ok(())
+}
+
+/// Validate stream amount is positive
+pub fn validate_amount(amount: i128) -> Result<(), Error> {
+    if amount <= 0 {
+        return Err(Error::InvalidAmount);
+    }
+    Ok(())
 }
 
 /// Metadata update request - only metadata can be changed
