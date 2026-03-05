@@ -7,10 +7,34 @@ mod event_versions;
 mod storage;
 mod burn;
 mod types;
+<<<<<<< main
+mod validation;
+mod timelock;
+mod pagination;
+mod mint;
+mod treasury;
+mod vesting;
+mod differential_engine;
+#[cfg(test)]
+mod comprehensive_differential_tests;
+#[cfg(test)]
+mod differential_proptest;
+
+use soroban_sdk::{contract, contractimpl, symbol_short, Address, Env, String, Vec};
+use types::{ContractMetadata, Error, FactoryState, TokenInfo, TokenStats, TokenCreationParams};
+
+// Contract metadata constants
+const CONTRACT_NAME: &str = "Nova Launch Token Factory";
+const CONTRACT_DESCRIPTION: &str = "No-code token deployment on Stellar";
+const CONTRACT_AUTHOR: &str = "Nova Launch Team";
+const CONTRACT_LICENSE: &str = "MIT";
+const CONTRACT_VERSION: &str = "1.0.0";
+=======
 mod token_creation;
 
 use soroban_sdk::{contract, contractimpl, Address, Env, String, Vec};
 use types::{Error, FactoryState, TokenInfo, TokenCreationParams};
+>>>>>>> main
 
 #[contract]
 pub struct TokenFactory;
@@ -503,6 +527,16 @@ impl TokenFactory {
 
         Ok(())
     }
+<<<<<<< main
+
+    /// Get token info by index
+   pub fn get_token_info(env: Env, index: u32) -> Result<TokenInfo, Error> {
+    let mut info = storage::get_token_info(&env, index).ok_or(Error::TokenNotFound)?;
+    info.is_paused = storage::is_token_paused(&env, index);   // ADD
+    Ok(info)
+}
+=======
+>>>>>>> main
 
     /// Get token info by index
     pub fn get_token_info(env: Env, index: u32) -> Result<TokenInfo, Error> {
@@ -703,6 +737,18 @@ impl TokenFactory {
         // Generate stream ID
         let stream_id = storage::increment_stream_count(&env);
 
+<<<<<<< main
+    if info.metadata_uri.is_some() {
+        return Err(Error::MetadataAlreadySet);
+    }
+    
+    info.metadata_uri = Some(new_metadata_uri);
+    storage::set_token_info(&env, index, &info);
+    Ok(())
+   }
+
+    /// Get token information by contract address
+=======
         // Create stream
         let stream = stream_types::StreamInfo {
             id: stream_id,
@@ -735,6 +781,7 @@ impl TokenFactory {
     }
 
     /// Get stream information by ID
+>>>>>>> main
     ///
     /// Retrieves complete vesting stream details including schedule,
     /// amounts, and metadata. This is a read-only operation.
@@ -1876,6 +1923,12 @@ mod supply_conservation_test;
 #[cfg(test)]
 mod fuzz_create_token_simple;
 
+#[cfg(test)]
+mod differential_test;
+
+#[cfg(test)]
+mod vesting_differential_proptest;
+
 // Temporarily disabled due to compilation issues
 // #[cfg(test)]
 // mod fuzz_update_fees;
@@ -1915,9 +1968,17 @@ mod gas_benchmark_comprehensive;
 // #[cfg(test)]
 // mod fuzz_string_boundaries;
 
+<<<<<<< main
+#[cfg(test)]
+mod stateful_model_test;
+
+#[cfg(test)]
+mod pagination_integration_test;
+=======
 // Temporarily disabled due to compilation issues
 // #[cfg(test)]
 // mod fuzz_numeric_boundaries;
+>>>>>>> main
 
 #[cfg(test)]
 mod batch_token_creation_test;
