@@ -184,7 +184,6 @@ fn emit_burn_event(env: &Env, token_index: u32, caller: &Address, amount: i128, 
     );
 }
 
-fn emit_admin_burn_event(env: &Env, token_index: u32, admin: &Address, holder: &Address, amount: i128, new_supply: i128) {
 /// Emit admin burn event (v1)
 /// 
 /// **Schema Version**: 1
@@ -215,7 +214,6 @@ fn emit_admin_burn_event(
     );
 }
 
-fn emit_batch_burn_event(env: &Env, token_index: u32, admin: &Address, count: u32, total_burned: i128, new_supply: i128) {
 /// Emit batch burn event (v1)
 /// 
 /// **Schema Version**: 1

@@ -752,16 +752,6 @@ impl TokenFactory {
     }
 
     /// Update metadata for a token (must not be set already)
-   pub fn set_metadata(env: Env, index: u32, new_metadata_uri: soroban_sdk::String) -> Result<(), Error> {
-    let mut info = storage::get_token_info(&env, index).ok_or(Error::TokenNotFound)?;
-
-    if storage::is_token_paused(&env, index) {   // ADD
-        return Err(Error::TokenPaused);          // ADD
-    }                                            // ADD
-
-    if info.metadata_uri.is_some() {
-        return Err(Error::MetadataAlreadySet);
-    /// Get token information by contract address
     ///
     /// Retrieves complete information about a token using its
     /// deployed contract address.
@@ -912,19 +902,6 @@ impl TokenFactory {
         Ok(())
     }
 
-    /// Set metadata URI for a token (one-time operation)
-    pub fn set_metadata(env: Env, index: u32, new_metadata_uri: soroban_sdk::String) -> Result<(), Error> {
-        let mut info = storage::get_token_info(&env, index).ok_or(Error::TokenNotFound)?;
-        if info.metadata_uri.is_some() {
-            return Err(Error::MetadataAlreadySet);
-        }
-        info.metadata_uri = Some(new_metadata_uri);
-        storage::set_token_info(&env, index, &info);
-        Ok(())
-    }
-
-    /// Burn tokens from caller's own balance
-    ///
     /// Allows a token holder to permanently destroy tokens from their
     /// own balance, reducing the total supply.
     ///
