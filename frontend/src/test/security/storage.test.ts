@@ -43,7 +43,7 @@ describe('Secure Storage', () => {
         // Try to store large data
         const largeData = 'x'.repeat(10 * 1024 * 1024); // 10MB
         localStorage.setItem('large', largeData);
-      } catch (e) {
+      } catch {
         expect(e).toBeInstanceOf(Error);
       }
     });
@@ -99,7 +99,7 @@ describe('Secure Storage', () => {
       
       try {
         atob(invalidData);
-      } catch (e) {
+      } catch {
         expect(e).toBeInstanceOf(Error);
       }
     });
@@ -154,7 +154,7 @@ describe('Secure Storage', () => {
       
       try {
         throw new Error('Operation failed'); // Don't include secretKey
-      } catch (e) {
+      } catch {
         expect((e as Error).message).not.toContain(secretKey);
       }
     });
@@ -244,7 +244,7 @@ describe('Secure Storage', () => {
           localStorage.setItem(test, test);
           localStorage.removeItem(test);
           return true;
-        } catch (e) {
+        } catch {
           return false;
         }
       };

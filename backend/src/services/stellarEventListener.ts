@@ -105,10 +105,6 @@ export class StellarEventListener {
       // Parse event topic to determine event type
       const eventType = this.parseEventType(event);
 
-      if (!eventType) {
-        return; // Unknown event type
-      }
-
       // Extract event data based on type
       const eventData = this.extractEventData(event, eventType);
 
@@ -116,12 +112,14 @@ export class StellarEventListener {
         return;
       }
 
-      // Trigger webhooks
-      await webhookDeliveryService.triggerEvent(
-        eventType,
-        eventData,
-        eventData.tokenAddress
-      );
+      // Trigger webhooks only if we have a webhook event type
+      if (eventType) {
+        await webhookDeliveryService.triggerEvent(
+          eventType,
+          eventData,
+          eventData.tokenAddress
+        );
+      }
     } catch (error) {
       console.error("Error processing event:", error);
     }
@@ -131,25 +129,27 @@ export class StellarEventListener {
    * Parse event type from Stellar event
    */
   private parseEventType(event: StellarEvent): WebhookEventType | null {
-    // Event topics are typically structured as [contract_id, event_name, ...]
-    if (event.topic.length < 2) {
+    // Event topics are typically structured as [event_name, ...]
+    if (event.topic.length < 1) {
       return null;
     }
 
-    const eventName = event.topic[1];
+    const eventName = event.topic[0];
 
     switch (eventName) {
-      case "burn":
-        // Determine if self-burn or admin-burn based on event data
-        return event.value?.admin
-          ? WebhookEventType.TOKEN_BURN_ADMIN
-          : WebhookEventType.TOKEN_BURN_SELF;
+      case "tok_burn":
+        return WebhookEventType.TOKEN_BURN_SELF;
 
-      case "token_created":
+      case "adm_burn":
+        return WebhookEventType.TOKEN_BURN_ADMIN;
+
+      case "tok_reg":
         return WebhookEventType.TOKEN_CREATED;
 
-      case "metadata_updated":
-        return WebhookEventType.TOKEN_METADATA_UPDATED;
+      case "adm_xfer":
+      case "adm_prop":
+        // Both admin transfer and admin proposed are admin-related events
+        return null; // No webhook type defined yet, but parse successfully
 
       default:
         return null;
@@ -161,28 +161,41 @@ export class StellarEventListener {
    */
   private extractEventData(
     event: StellarEvent,
-    eventType: WebhookEventType
+    eventType: WebhookEventType | null
   ): any {
     const baseData = {
       transactionHash: event.transaction_hash,
       ledger: event.ledger,
     };
 
+    if (!eventType) {
+      // Return base data for events without specific webhook types
+      return baseData;
+    }
+
     switch (eventType) {
       case WebhookEventType.TOKEN_BURN_SELF:
-      case WebhookEventType.TOKEN_BURN_ADMIN:
         return {
           ...baseData,
-          tokenAddress: event.value?.token_address || "",
+          tokenAddress: event.topic[1] || "",
           from: event.value?.from || "",
           amount: event.value?.amount?.toString() || "0",
           burner: event.value?.burner || event.value?.from || "",
         };
 
+      case WebhookEventType.TOKEN_BURN_ADMIN:
+        return {
+          ...baseData,
+          tokenAddress: event.topic[1] || "",
+          from: event.value?.from || "",
+          amount: event.value?.amount?.toString() || "0",
+          admin: event.value?.admin || "",
+        };
+
       case WebhookEventType.TOKEN_CREATED:
         return {
           ...baseData,
-          tokenAddress: event.value?.token_address || "",
+          tokenAddress: event.topic[1] || "",
           creator: event.value?.creator || "",
           name: event.value?.name || "",
           symbol: event.value?.symbol || "",
@@ -193,13 +206,13 @@ export class StellarEventListener {
       case WebhookEventType.TOKEN_METADATA_UPDATED:
         return {
           ...baseData,
-          tokenAddress: event.value?.token_address || "",
+          tokenAddress: event.topic[1] || "",
           metadataUri: event.value?.metadata_uri || "",
           updatedBy: event.value?.updated_by || "",
         };
 
       default:
-        return null;
+        return baseData;
     }
   }
 

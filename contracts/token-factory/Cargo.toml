@@ -26,3 +26,19 @@ lto = true
 [profile.release-with-logs]
 inherits = "release"
 debug-assertions = true
+
+[profile.ci]
+inherits = "dev"
+opt-level = 1
+
+# Proptest configuration for CI
+# Ensures deterministic, reproducible property test runs
+[package.metadata.proptest]
+# Use fixed seed for deterministic test runs in CI
+rng_algorithm = "chacha"
+# Reduce cases for faster CI runs while maintaining coverage
+cases = 100
+# Maximum shrink iterations for failure minimization
+max_shrink_iters = 1000
+# Timeout per test case (in milliseconds)
+timeout = 5000

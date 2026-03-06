@@ -93,11 +93,12 @@ pub fn validate_admin(env: &Env) -> Result<(), Error> {
 /// // Missing treasury (before initialization)
 /// validate_treasury(&env)?; // Returns Err(Error::MissingTreasury)
 /// ```
+#[allow(dead_code)]
 pub fn validate_treasury(env: &Env) -> Result<(), Error> {
     // Get treasury address - will panic if not set, which we catch as MissingTreasury
     // In Soroban, storage::get_treasury() will panic if the key doesn't exist
     // We need to check existence first
-    
+
     // Note: storage module doesn't have has_treasury(), so we attempt to get it
     // and handle the panic by checking if admin is set (as a proxy for initialization)
     if !storage::has_admin(env) {
@@ -196,6 +197,7 @@ pub fn validate_fees(env: &Env) -> Result<(), Error> {
 /// // Inconsistent count
 /// validate_token_count(&env)?; // Returns Err(Error::InconsistentTokenCount)
 /// ```
+#[allow(dead_code)]
 pub fn validate_token_count(env: &Env) -> Result<(), Error> {
     let token_count = storage::get_token_count(env);
 
@@ -264,6 +266,7 @@ pub fn validate_token_count(env: &Env) -> Result<(), Error> {
 ///
 /// Call this function after contract initialization or after operations that
 /// modify multiple state variables to ensure consistency.
+#[allow(dead_code)]
 pub fn validate_state(env: &Env) -> Result<(), Error> {
     // Validate in order of increasing cost (fail-fast optimization)
     validate_admin(env)?;

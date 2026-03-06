@@ -1,3 +1,7 @@
 [workspace]
 members = ["token-factory"]
 resolver = "2"
+
+[profile.ci]
+inherits = "dev"
+opt-level = 1

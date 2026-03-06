@@ -1,0 +1,103 @@
+name: Gas Benchmarks
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'contracts/token-factory/src/**/*.rs'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'contracts/token-factory/src/**/*.rs'
+
+jobs:
+  gas-benchmarks:
+    name: Gas Benchmark Regression Tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./contracts/token-factory
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-action@stable
+        with:
+          profile: minimal
+          toolchain: stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          working-directory: ./contracts/token-factory
+
+      - name: Run Gas Benchmarks
+        run: |
+          # Run create/mint benchmarks and capture output
+          echo "=== Running Create/Mint Benchmarks ===" >> $GITHUB_STEP_SUMMARY
+          cargo test create_mint_bench -- --nocapture 2>&1 | tee create_mint_bench.log
+          
+          echo "=== Running Burn Benchmarks ===" >> $GITHUB_STEP_SUMMARY
+          cargo test bench_single_burn -- --nocapture 2>&1 | tee burn_bench.log
+          
+          echo "=== Running Comprehensive Benchmarks ===" >> $GITHUB_STEP_SUMMARY
+          cargo test bench_initialize_comprehensive -- --nocapture 2>&1 | tee comprehensive_bench.log
+
+      - name: Check for Regression Warnings
+        run: |
+          # Check if any regression warnings were detected
+          if grep -q "\[REGRESSION\]" create_mint_bench.log burn_bench.log comprehensive_bench.log; then
+            echo "## ⚠️ Performance Regression Detected" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "The following benchmarks detected regressions:" >> $GITHUB_STEP_SUMMARY
+            grep "\[REGRESSION\]" create_mint_bench.log burn_bench.log comprehensive_bench.log >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Please investigate these performance changes." >> $GITHUB_STEP_SUMMARY
+            exit 1
+          else
+            echo "## ✅ No Regressions Detected" >> $GITHUB_STEP_SUMMARY
+            echo "All gas benchmarks are within acceptable thresholds." >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Upload Benchmark Logs
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gas-benchmark-logs
+          path: |
+            *.log
+          retention-days: 30
+
+  baseline-check:
+    name: Baseline Value Check
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./contracts/token-factory
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-action@stable
+        with:
+          profile: minimal
+          toolchain: stable
+
+      - name: Check Baseline Values
+        run: |
+          # Check if baseline values are still at 0 (not set)
+          if grep -q "const BASELINE_CREATE_TOKEN_CPU: u64 = 0;" src/create_mint_bench.rs; then
+            echo "## ⚠️ Baseline Values Not Set" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "The benchmark baseline values are still set to 0." >> $GITHUB_STEP_SUMMARY
+            echo "Please run the baseline report and update the constants:" >> $GITHUB_STEP_SUMMARY
+            echo "```bash" >> $GITHUB_STEP_SUMMARY
+            echo "cargo test bench_create_mint_baseline_report -- --nocapture" >> $GITHUB_STEP_SUMMARY
+            echo "```" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Then copy the baseline values to src/create_mint_bench.rs" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "## ✅ Baseline Values Configured" >> $GITHUB_STEP_SUMMARY
+          fi
