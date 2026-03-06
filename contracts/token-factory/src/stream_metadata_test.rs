@@ -3,7 +3,7 @@
 use crate::events;
 use crate::stream_types::{validate_metadata, StreamInfo};
 use crate::types::Error;
-use soroban_sdk::{testutils::{Address as _, Events}, Address, Env, String};
+use soroban_sdk::{testutils::Address as _, Address, Env, String};
 
 #[test]
 fn test_stream_metadata_present() {
@@ -19,6 +19,9 @@ fn test_stream_metadata_present() {
         amount: 1000,
         metadata: metadata.clone(),
         created_at: env.ledger().timestamp(),
+        claimed: false,
+        paused: false,
+        cancelled: false,
     };
     
     assert_eq!(stream.metadata, metadata);
@@ -38,6 +41,9 @@ fn test_stream_metadata_absent() {
         amount: 1000,
         metadata: None,
         created_at: env.ledger().timestamp(),
+        claimed: false,
+        paused: false,
+        cancelled: false,
     };
     
     assert_eq!(stream.metadata, None);

@@ -47,7 +47,7 @@
 /// 
 /// Any schema changes require creating a new version (e.g., init_v2).
 
-use soroban_sdk::{symbol_short, Address, Env};
+use soroban_sdk::{symbol_short, Address, Env, String};
 
 /// Emit initialized event (v1)
 /// 
@@ -95,6 +95,37 @@ pub fn emit_token_registered(env: &Env, token_address: &Address, creator: &Addre
     );
 }
 
+/// Emit token created event with full details
+/// 
+/// **Event Name**: tok_crt
+/// 
+/// **Topics** (indexed):
+/// - Event name: "tok_crt"
+/// - token_address: Address - The newly created token's address
+/// 
+/// **Payload** (non-indexed):
+/// - creator: Address - The token creator
+/// - name: String - Token name
+/// - symbol: String - Token symbol
+/// - decimals: u32 - Decimal places
+/// - initial_supply: i128 - Initial token supply
+/// 
+/// Emitted when a new token is created with full metadata
+pub fn emit_token_created(
+    env: &Env,
+    token_address: &Address,
+    creator: &Address,
+    name: &String,
+    symbol: &String,
+    decimals: u32,
+    initial_supply: i128,
+) {
+    env.events().publish(
+        (symbol_short!("tok_crt"), token_address.clone()),
+        (creator.clone(), name.clone(), symbol.clone(), decimals, initial_supply),
+    );
+}
+
 /// Emit admin transfer event (v1)
 /// 
 /// **Schema Version**: 1
@@ -113,7 +144,7 @@ pub fn emit_token_registered(env: &Env, token_address: &Address, creator: &Addre
 /// The ledger automatically records transaction timestamps.
 pub fn emit_admin_transfer(env: &Env, old_admin: &Address, new_admin: &Address) {
     env.events().publish(
-        (symbol_short!("adm_xfer"),),
+        (symbol_short!("adm_xf_v1"),),
         (old_admin, new_admin),
     );
 }
@@ -171,7 +202,7 @@ pub fn emit_unpause(env: &Env, admin: &Address) {
 /// **Schema Stability**: This schema is immutable. Any changes require a new version.
 pub fn emit_fees_updated(env: &Env, base_fee: i128, metadata_fee: i128) {
     env.events().publish(
-        (symbol_short!("fees_upd"),),
+        (symbol_short!("fee_up_v1"),),
         (base_fee, metadata_fee),
     );
 }
@@ -201,7 +232,7 @@ pub fn emit_admin_burn(
     amount: i128,
 ) {
     env.events().publish(
-        (symbol_short!("adm_burn"), token_address.clone()),
+        (symbol_short!("adm_br_v1"), token_address.clone()),
         (admin, from, amount),
     );
 }
@@ -249,67 +280,51 @@ pub fn emit_clawback_toggled(
 /// Used when multiple tokens are burned in a batch operation
 pub fn emit_token_burned(env: &Env, token_address: &Address, amount: i128) {
     env.events().publish(
-        (symbol_short!("tkn_burn"), token_address.clone()),
+        (symbol_short!("tok_br_v1"), token_address.clone()),
         (amount,),
     );
 }
 
-/// Emit token created event
-/// 
-/// Published when a new token is successfully created
-pub fn emit_token_created(
-    env: &Env,
-    token_address: &Address,
-    creator: &Address,
-) {
+
+// ── Timelock events ─────────────────────────────────────────
+
+/// Emit timelock configured event
+///
+/// Emitted when timelock is initialized or updated
+pub fn emit_timelock_configured(env: &Env, delay_seconds: u64) {
     env.events().publish(
-        (symbol_short!("tkn_crtd"), token_address.clone()),
-        creator,
+        (symbol_short!("tl_cfg"),),
+        (delay_seconds,),
     );
 }
 
 /// Emit change scheduled event
 ///
 /// Emitted when a sensitive change is scheduled with timelock
-pub fn emit_change_scheduled(env: &Env, change_id: u64, change_type: &crate::types::ChangeType, execute_at: u64) {
-    let change_type_str = match change_type {
-        crate::types::ChangeType::FeeUpdate => "FeeUpdate",
-        crate::types::ChangeType::PauseUpdate => "PauseUpdate",
-        crate::types::ChangeType::TreasuryUpdate => "TreasuryUpdate",
-    };
+pub fn emit_change_scheduled(env: &Env, change_id: u64, change_type: crate::types::ChangeType, execute_at: u64) {
     env.events().publish(
         (symbol_short!("ch_sched"), change_id),
-        (change_type_str, execute_at),
+        (change_type, execute_at),
     );
 }
 
 /// Emit change executed event
 ///
 /// Emitted when a pending change is successfully executed
-pub fn emit_change_executed(env: &Env, change_id: u64, change_type: &crate::types::ChangeType) {
-    let change_type_str = match change_type {
-        crate::types::ChangeType::FeeUpdate => "FeeUpdate",
-        crate::types::ChangeType::PauseUpdate => "PauseUpdate",
-        crate::types::ChangeType::TreasuryUpdate => "TreasuryUpdate",
-    };
+pub fn emit_change_executed(env: &Env, change_id: u64, change_type: crate::types::ChangeType) {
     env.events().publish(
         (symbol_short!("ch_exec"), change_id),
-        (change_type_str,),
+        (change_type,),
     );
 }
 
 /// Emit change cancelled event
 ///
 /// Emitted when a pending change is cancelled before execution
-pub fn emit_change_cancelled(env: &Env, change_id: u64, change_type: &crate::types::ChangeType) {
-    let change_type_str = match change_type {
-        crate::types::ChangeType::FeeUpdate => "FeeUpdate",
-        crate::types::ChangeType::PauseUpdate => "PauseUpdate",
-        crate::types::ChangeType::TreasuryUpdate => "TreasuryUpdate",
-    };
+pub fn emit_change_cancelled(env: &Env, change_id: u64, change_type: crate::types::ChangeType) {
     env.events().publish(
         (symbol_short!("ch_cncl"), change_id),
-        (change_type_str,),
+        (change_type,),
     );
 }
 
@@ -377,16 +392,88 @@ pub fn emit_treasury_policy_updated(env: &Env, daily_cap: i128, allowlist_enable
     );
 }
 
-/// Emit batch tokens created event
+/// Emit stream metadata updated event (v1)
 /// 
-/// Published when multiple tokens are created in a batch operation
-pub fn emit_batch_tokens_created(
+/// **Schema Version**: 1
+/// **Event Name**: strm_md
+/// 
+/// **Topics** (indexed):
+/// - Event name: "strm_md"
+/// - stream_id: u32 - The stream ID being updated
+/// 
+/// **Payload** (non-indexed):
+/// - updater: Address - The address that updated the metadata (creator/admin)
+/// - has_metadata: bool - Whether metadata is now present (true) or cleared (false)
+/// 
+/// **Schema Stability**: This schema is immutable. Any changes require a new version.
+/// 
+/// Emitted when stream metadata is successfully updated
+pub fn emit_stream_metadata_updated(
     env: &Env,
-    creator: &Address,
-    count: u32,
+    stream_id: u32,
+    updater: &Address,
+    has_metadata: bool,
 ) {
     env.events().publish(
-        (symbol_short!("batch_tkn"),),
-        (creator, count),
+        (symbol_short!("strm_md"), stream_id),
+        (updater, has_metadata),
+    );
+}
+
+/// Emit stream created event (v1)
+/// 
+/// **Schema Version**: 1
+/// **Event Name**: strm_crt
+/// 
+/// **Topics** (indexed):
+/// - Event name: "strm_crt"
+/// - stream_id: u32 - The newly created stream ID
+/// 
+/// **Payload** (non-indexed):
+/// - creator: Address - The stream creator
+/// - recipient: Address - The stream recipient
+/// - amount: i128 - The stream amount
+/// - has_metadata: bool - Whether metadata is present
+/// 
+/// **Schema Stability**: This schema is immutable. Any changes require a new version.
+/// 
+/// Emitted when a new stream is created
+pub fn emit_stream_created(
+    env: &Env,
+    stream_id: u32,
+    creator: &Address,
+    recipient: &Address,
+    amount: i128,
+    has_metadata: bool,
+) {
+    env.events().publish(
+        (symbol_short!("strm_crt"), stream_id),
+        (creator, recipient, amount, has_metadata),
+    );
+}
+
+
+/// Emit metadata set event
+/// 
+/// **Event Name**: meta_set
+/// 
+/// **Topics** (indexed):
+/// - Event name: "meta_set"
+/// - token_address: Address - The token address
+/// 
+/// **Payload** (non-indexed):
+/// - admin: Address - The admin who set the metadata
+/// - metadata_uri: String - The metadata URI
+/// 
+/// Emitted when token metadata is set
+pub fn emit_metadata_set(
+    env: &Env,
+    token_address: &Address,
+    admin: &Address,
+    metadata_uri: &String,
+) {
+    env.events().publish(
+        (symbol_short!("meta_set"), token_address.clone()),
+        (admin.clone(), metadata_uri.clone()),
     );
 }

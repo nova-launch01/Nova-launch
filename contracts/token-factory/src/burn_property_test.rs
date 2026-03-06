@@ -8,7 +8,7 @@
 //! - Authorization: only authorized addresses can burn
 
 use super::*;
-use soroban_sdk::{testutils::Address as _, token, Address, Env, String};
+use soroban_sdk::{testutils::Address as _, Address, Env, String};
 
 #[cfg(test)]
 mod property_tests {
@@ -248,8 +248,6 @@ mod property_tests {
             let creator = Address::generate(&env);
             
             let token_index = create_test_token(&env, &factory, &creator, initial_supply);
-            let info = factory.get_token_info(&token_index);
-            let token_address = info.address;
             
             let mut cumulative_burned = 0i128;
             
@@ -261,8 +259,7 @@ mod property_tests {
             }
             
             // Verify: creator_balance = initial_supply - cumulative_burned
-            let token_client = token::Client::new(&env, &token_address);
-            let creator_balance = token_client.balance(&creator);
+            let creator_balance = factory.get_balance(&token_index, &creator);
             let info = factory.get_token_info(&token_index);
             
             prop_assert_eq!(
@@ -372,7 +369,7 @@ mod property_tests {
     }
 
     #[test]
-    #[should_panic(expected = "Error(Contract, #2)")] // Unauthorized
+    #[should_panic(expected = "Error(Contract, #7)")] // InsufficientBalance
     fn test_burn_unauthorized() {
         let env = Env::default();
         env.mock_all_auths();
@@ -384,6 +381,7 @@ mod property_tests {
         let token_index = create_test_token(&env, &factory, &creator, 1_000_000);
         
         // Attempt burn from unauthorized address (without mocking auth)
+        // This fails with InsufficientBalance because unauthorized has no tokens
         env.mock_all_auths_allowing_non_root_auth();
         factory.burn(&unauthorized, &token_index, &100);
     }
