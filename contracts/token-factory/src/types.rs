@@ -175,6 +175,12 @@ pub struct FeeUpdate {
 /// * `TreasuryPolicy` - Treasury withdrawal policy
 /// * `WithdrawalPeriod` - Current withdrawal period tracking
 /// * `AllowedRecipient(Address)` - Whether address is allowed recipient
+/// * `StreamCount` - Total number of streams created
+/// * `Stream(u64)` - Stream info by ID
+/// * `NextStreamId` - Next available stream ID
+/// * `VoteSnapshot(u64)` - Vote snapshot by ID
+/// * `VoterWeight(u64, Address)` - Voter weight in snapshot (snapshot_id, voter)
+/// * `NextSnapshotId` - Next available snapshot ID
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum DataKey {
