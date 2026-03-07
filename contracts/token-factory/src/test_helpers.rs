@@ -170,7 +170,7 @@ impl<'a> VoteHelper<'a> {
         Ok(())
     }
 
-    pub fn counts(&self, proposal_id: u64) -> Option<(u32, u32, u32)> {
+    pub fn counts(&self, proposal_id: u64) -> Option<(i128, i128, i128)> {
         timelock::get_vote_counts(self.env, proposal_id)
     }
 }
@@ -193,7 +193,7 @@ impl<'a> StateAssertions<'a> {
         assert_eq!(storage::get_proposal_count(self.env) as u64, count);
     }
 
-    pub fn assert_vote_counts(&self, proposal_id: u64, yes: u32, no: u32, abstain: u32) {
+    pub fn assert_vote_counts(&self, proposal_id: u64, yes: i128, no: i128, abstain: i128) {
         let counts = timelock::get_vote_counts(self.env, proposal_id).unwrap();
         assert_eq!(counts, (yes, no, abstain));
     }

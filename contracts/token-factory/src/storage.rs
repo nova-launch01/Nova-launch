@@ -785,6 +785,21 @@ pub fn get_creator_token_count(env: &Env, creator: &Address) -> u32 {
         .unwrap_or(0)
 }
 
+/// Get beneficiary stream count (alias for creator token count for now)
+pub fn get_beneficiary_stream_count(env: &Env, beneficiary: &Address) -> u32 {
+    get_creator_token_count(env, beneficiary)
+}
+
+/// Get beneficiary stream entry (alias for creator token entry for now)
+pub fn get_beneficiary_stream_entry(env: &Env, beneficiary: &Address, index: u32) -> Option<u32> {
+    let tokens = get_creator_tokens(env, beneficiary);
+    if index < tokens.len() {
+        Some(tokens.get(index).unwrap())
+    } else {
+        None
+    }
+}
+
 
 // ── Token-stream indexing functions ─────────────────────────────
 
@@ -932,15 +947,15 @@ pub fn increment_stream_count(env: &Env) -> Result<u32, Error> {
 /// Get stream info by ID
 pub fn get_stream(env: &Env, stream_id: u64) -> Option<crate::types::StreamInfo> {
     env.storage()
-        .persistent()
-        .get(&DataKey::Stream(stream_id))
+        .temporary()
+        .get(&DataKey::Stream(stream_id.try_into().unwrap()))
 }
 
 /// Store stream info
 pub fn set_stream(env: &Env, stream_id: u64, stream: &crate::types::StreamInfo) {
     env.storage()
-        .persistent()
-        .set(&DataKey::Stream(stream_id), stream);
+        .temporary()
+        .set(&DataKey::Stream(stream_id.try_into().unwrap()), stream);
 }
 
 /// Get next stream ID

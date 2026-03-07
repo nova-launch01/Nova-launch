@@ -115,7 +115,10 @@ fn test_mint_max_supply_overflow_protection() {
         metadata_uri: None,
         created_at: env.ledger().timestamp(),
         clawback_enabled: false,
-    };
+            freeze_enabled: false,
+            is_paused: false,
+        
+        };
     
     storage::set_token_info(&env, 0, &token_info);
     
@@ -153,7 +156,10 @@ fn test_burn_underflow_protection() {
         metadata_uri: None,
         created_at: env.ledger().timestamp(),
         clawback_enabled: false,
-    };
+            freeze_enabled: false,
+            is_paused: false,
+        
+        };
     
     storage::set_token_info(&env, 0, &token_info);
     storage::set_balance(&env, 0, &creator, 100);
@@ -279,7 +285,10 @@ fn test_batch_burn_total_overflow_protection() {
         metadata_uri: None,
         created_at: env.ledger().timestamp(),
         clawback_enabled: false,
-    };
+            freeze_enabled: false,
+            is_paused: false,
+        
+        };
     storage::set_token_info(&env, 0, &token_info);
     
     // Create batch that would overflow when summed
@@ -468,6 +477,9 @@ fn test_arithmetic_fuzz_mint_with_random_supplies() {
             metadata_uri: None,
             created_at: env.ledger().timestamp(),
             clawback_enabled: false,
+            freeze_enabled: false,
+            is_paused: false,
+        
         };
         storage::set_token_info(&env, 0, &token_info);
         

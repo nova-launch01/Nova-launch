@@ -1,7 +1,7 @@
 use soroban_sdk::{Address, Env, Vec};
 
 use crate::storage;
-use crate::types::{Error, PaginatedTokens};
+use crate::types::{Error, PaginatedTokens, PaginationCursor, TokenInfo};
 
 const MAX_PAGE_SIZE: u32 = 100;
 const DEFAULT_PAGE_SIZE: u32 = 20;
@@ -79,7 +79,11 @@ mod tests {
                 metadata_uri: None,
                 created_at: env.ledger().timestamp(),
                 clawback_enabled: false,
-            };
+                is_paused: false,
+                freeze_enabled: false,
+            
+        
+        };
             storage::set_token_info(&env, i, &token_info);
             storage::add_creator_token(&env, &creator, i);
         }
@@ -215,7 +219,11 @@ mod tests {
                 metadata_uri: None,
                 created_at: env.ledger().timestamp(),
                 clawback_enabled: false,
-            };
+                is_paused: false,
+                freeze_enabled: false,
+            
+        
+        };
             storage::set_token_info(&env, i, &token_info);
             storage::add_creator_token(&env, &creator1, i);
         }
@@ -234,7 +242,11 @@ mod tests {
                 metadata_uri: None,
                 created_at: env.ledger().timestamp(),
                 clawback_enabled: false,
-            };
+                is_paused: false,
+                freeze_enabled: false,
+            
+        
+        };
             storage::set_token_info(&env, i, &token_info);
             storage::add_creator_token(&env, &creator2, i);
         }

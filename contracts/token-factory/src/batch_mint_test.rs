@@ -44,7 +44,10 @@ fn setup_token(
         total_burned: 0,
         burn_count: 0,
         clawback_enabled: false,
-    };
+            freeze_enabled: false,
+            is_paused: false,
+        
+        };
 
     env.as_contract(&client.address, || {
         env.storage()

@@ -162,6 +162,9 @@ impl GovBenchSetup {
             metadata_uri: None,
             created_at: self.env.ledger().timestamp(),
             clawback_enabled: false,
+            freeze_enabled: false,
+            is_paused: false,
+        
         };
         
         let token_index = crate::storage::get_token_count(&self.env);

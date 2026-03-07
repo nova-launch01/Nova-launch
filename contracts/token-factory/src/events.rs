@@ -563,7 +563,7 @@ pub fn emit_proposal_created_v1(
     eta: u64,
 ) {
     env.events().publish(
-        (symbol_short!("prop_cr"), proposal_id),
+        (symbol_short!("prop_crv1"), proposal_id),
         (proposer, action_type, start_time, end_time, eta),
     );
 }
@@ -591,7 +591,7 @@ pub fn emit_vote_cast_v1(
     vote_choice: crate::types::VoteChoice,
 ) {
     env.events().publish(
-        (symbol_short!("vote_cs"), proposal_id),
+        (symbol_short!("vote_csv1"), proposal_id),
         (voter, vote_choice),
     );
 }
@@ -617,7 +617,7 @@ pub fn emit_proposal_queued_v1(
     eta: u64,
 ) {
     env.events().publish(
-        (symbol_short!("prop_qu"), proposal_id),
+        (symbol_short!("prop_quv1"), proposal_id),
         (eta,),
     );
 }
@@ -645,7 +645,7 @@ pub fn emit_proposal_executed_v1(
     success: bool,
 ) {
     env.events().publish(
-        (symbol_short!("prop_ex"), proposal_id),
+        (symbol_short!("prop_exv1"), proposal_id),
         (executor, success),
     );
 }
@@ -671,7 +671,64 @@ pub fn emit_proposal_cancelled_v1(
     canceller: &Address,
 ) {
     env.events().publish(
-        (symbol_short!("prop_ca"), proposal_id),
+        (symbol_short!("prop_cav1"), proposal_id),
         (canceller,),
     );
+}
+
+// ── Aliases for backward compatibility ───────────────────────
+
+pub fn emit_proposal_created(
+    env: &Env,
+    proposal_id: u64,
+    proposer: &Address,
+    action_type: crate::types::ActionType,
+    start_time: u64,
+    end_time: u64,
+    eta: u64,
+) {
+    emit_proposal_created_v1(env, proposal_id, proposer, action_type, start_time, end_time, eta);
+}
+
+pub fn emit_vote_cast(
+    env: &Env,
+    proposal_id: u64,
+    voter: &Address,
+    vote_choice: crate::types::VoteChoice,
+) {
+    emit_vote_cast_v1(env, proposal_id, voter, vote_choice);
+}
+
+pub fn emit_proposal_voted(
+    env: &Env,
+    proposal_id: u64,
+    voter: &Address,
+    vote_choice: crate::types::VoteChoice,
+) {
+    emit_vote_cast_v1(env, proposal_id, voter, vote_choice);
+}
+
+pub fn emit_proposal_queued(
+    env: &Env,
+    proposal_id: u64,
+    eta: u64,
+) {
+    emit_proposal_queued_v1(env, proposal_id, eta);
+}
+
+pub fn emit_proposal_executed(
+    env: &Env,
+    proposal_id: u64,
+    executor: &Address,
+    success: bool,
+) {
+    emit_proposal_executed_v1(env, proposal_id, executor, success);
+}
+
+pub fn emit_proposal_cancelled(
+    env: &Env,
+    proposal_id: u64,
+    canceller: &Address,
+) {
+    emit_proposal_cancelled_v1(env, proposal_id, canceller);
 }

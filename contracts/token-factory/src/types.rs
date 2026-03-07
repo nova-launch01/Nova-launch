@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use soroban_sdk::{contracterror, contracttype, Address, String, Vec};
+use soroban_sdk::{self, contracterror, contracttype, Address, Env, String, Vec, Bytes};
 
 /// Factory state containing administrative configuration
 ///
@@ -84,8 +84,37 @@ pub struct TokenInfo {
     pub burn_count: u32,
     pub metadata_uri: Option<String>,
     pub created_at: u64,
-    pub is_paused: bool,   // NEW — token-level pause flag
     pub is_paused: bool,
+    pub clawback_enabled: bool,
+    pub freeze_enabled: bool,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct StreamInfo {
+    pub id: u64,
+    pub creator: Address,
+    pub recipient: Address,
+    pub token_index: u32,
+    pub total_amount: i128,
+    pub claimed_amount: i128,
+    pub start_time: u64,
+    pub end_time: u64,
+    pub cliff_time: u64,
+    pub metadata: Option<String>,
+    pub cancelled: bool,
+    pub paused: bool,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct StreamParams {
+    pub recipient: Address,
+    pub token_index: u32,
+    pub total_amount: i128,
+    pub start_time: u64,
+    pub end_time: u64,
+    pub cliff_time: u64,
 }
 
 /// Compact read-only snapshot of a token's current state.
@@ -95,11 +124,8 @@ pub struct TokenInfo {
 pub struct TokenStats {
     pub current_supply: i128,  // live circulating supply
     pub total_burned:   i128,  // cumulative amount burned since creation
-    pub burn_count:     u32,   // number of burn operations performed
-    pub is_paused:      bool,  // token-level pause flag
-    pub has_clawback:   bool,  // clawback policy flag (reserved; always false for now)
-    pub total_burned: i128,
-    pub burn_count: u32,
+    pub burn_count:     u32,
+    pub is_paused:      bool,
     pub clawback_enabled: bool,
     pub freeze_enabled: bool,
 }
@@ -175,11 +201,18 @@ pub enum DataKey {
     TreasuryPolicy,
     WithdrawalPeriod,
     AllowedRecipient(Address),
+    Proposal(u64),
+    ProposalCount,
+    NextProposalId,
+    ProposalVote(u64, Address),
     // Stream management keys
-    StreamCount,                    // Total number of streams created
-    Stream(u32),                    // Stream info by ID
-    StreamByCreator(Address, u32),  // Index streams by creator for pagination
-    GovernanceConfig,               // Governance quorum and approval thresholds
+    StreamCount,
+    Stream(u32),
+    StreamByCreator(Address, u32),
+    TokenStreams(u32),
+    TokenStreamCount(u32),
+    NextStreamId,
+    GovernanceConfig,
 }
 
 /// Contract error codes
@@ -244,6 +277,28 @@ pub enum Error {
     InvalidMetadataFee = 24,
     InconsistentTokenCount = 25,
     TokenPaused = 26,
+    StreamNotFound = 27,
+    CliffNotReached = 28,
+    StreamCancelled = 29,
+    InvalidSchedule = 30,
+    StreamPaused = 31,
+    VotingNotStarted = 32,
+    VotingEnded = 33,
+    ProposalExecuted = 34,
+    ProposalCancelled = 35,
+    InvalidVote = 36,
+    ProposalInTerminalState = 37,
+    InvalidStateTransition = 38,
+    QuorumNotMet = 39,
+    ProposalNotFound = 40,
+    ProposalNotQueued = 41,
+    InvalidTimeWindow = 44,
+    PayloadTooLarge = 45,
+    AlreadyVoted = 46,
+    VotingClosed = 47,
+    AddressFrozen = 48,
+    FreezeNotEnabled = 49,
+    AddressNotFrozen = 50,
 }
 
 /// Governance configuration
@@ -277,6 +332,38 @@ pub struct TimelockConfig {
 /// Type of pending change
 ///
 /// Identifies which operation is being timelocked.
+#[contracttype]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ActionType {
+    FeeChange,
+    TreasuryChange,
+    PauseContract,
+    UnpauseContract,
+    PolicyUpdate,
+}
+
+#[contracttype]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum VoteChoice {
+    For,
+    Against,
+    Abstain,
+}
+
+#[contracttype]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ProposalState {
+    Created,
+    Active,
+    Succeeded,
+    Defeated,
+    Queued,
+    Executed,
+    Cancelled,
+    Expired,
+    Failed,
+}
+
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ChangeType {
@@ -322,16 +409,19 @@ pub struct PendingChange {
 pub struct Proposal {
     pub id: u64,
     pub proposer: Address,
-    pub action: ActionType,
+    pub action_type: ActionType,
+    pub payload: Bytes,
     pub description: String,
     pub created_at: u64,
-    pub voting_ends_at: u64,
-    pub execution_delay: u64,
+    pub start_time: u64,
+    pub end_time: u64,
+    pub eta: u64,
     pub votes_for: i128,
     pub votes_against: i128,
     pub votes_abstain: i128,
-    pub executed: bool,
-    pub cancelled: bool,
+    pub state: ProposalState,
+    pub executed_at: Option<u64>,
+    pub cancelled_at: Option<u64>,
 }
 
 /// Pagination cursor for token queries
@@ -356,9 +446,17 @@ pub struct PaginationCursor {
 /// * `cursor` - Cursor for next page (None = no more results)
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
+pub struct StreamPage {
+    pub token_indices: Vec<u32>,
+    pub next_cursor: Option<u32>,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PaginatedTokens {
     pub tokens: soroban_sdk::Vec<TokenInfo>,
-    pub cursor: Option<u32>,
+    pub has_more: bool,
+    pub cursor: PaginationCursor,
 }
 
 /// Treasury withdrawal policy

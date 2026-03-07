@@ -20,7 +20,10 @@ fn setup_mock_token(env: &Env, client: &TokenFactoryClient, creator: &Address) -
         total_burned: 0,
         burn_count: 0,
         clawback_enabled: true,
-    };
+            freeze_enabled: false,
+            is_paused: false,
+        
+        };
     
     // Store token info
     storage::set_token_info_by_address(env, &token_address, &token_info);
@@ -167,7 +170,10 @@ fn test_admin_burn_clawback_disabled() {
         total_burned: 0,
         burn_count: 0,
         clawback_enabled: false,
-    };
+            freeze_enabled: false,
+            is_paused: false,
+        
+        };
     storage::set_token_info_by_address(&env, &token_address, &token_info);
     
     // Should fail with ClawbackDisabled error
@@ -246,7 +252,10 @@ fn test_set_clawback_enable() {
         total_burned: 0,
         burn_count: 0,
         clawback_enabled: false,
-    };
+            freeze_enabled: false,
+            is_paused: false,
+        
+        };
     storage::set_token_info_by_address(&env, &token_address, &token_info);
     
     // Enable clawback

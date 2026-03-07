@@ -423,9 +423,9 @@ mod proposal_state_machine_tests {
     }
 
     /// Test state machine invariants hold across all transitions
-    #[test]
-    fn test_state_machine_invariants() {
-        let all_states = vec![
+        let env = soroban_sdk::Env::default();
+        let all_states = soroban_sdk::vec![
+            &env,
             ProposalState::Created,
             ProposalState::Active,
             ProposalState::Succeeded,
@@ -456,10 +456,9 @@ mod proposal_state_machine_tests {
     }
 
     /// Test that valid next states are correctly identified
-    #[test]
-    fn test_valid_next_states_completeness() {
-        // For each state, verify that get_valid_next_states matches validate_transition
-        let all_states = vec![
+        let env = soroban_sdk::Env::default();
+        let all_states = soroban_sdk::vec![
+            &env,
             ProposalState::Created,
             ProposalState::Active,
             ProposalState::Succeeded,
@@ -470,8 +469,8 @@ mod proposal_state_machine_tests {
             ProposalState::Cancelled,
         ];
 
-        for from_state in &all_states {
-            let valid_next = ProposalStateMachine::get_valid_next_states(*from_state);
+        for from_state in all_states.iter() {
+            let valid_next = ProposalStateMachine::get_valid_next_states(&env, from_state);
 
             for to_state in &all_states {
                 let is_valid =

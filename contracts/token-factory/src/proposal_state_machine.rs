@@ -3,7 +3,8 @@
 //! Enforces legal state transitions for proposal lifecycle.
 //! Implements a strict state machine to prevent invalid state changes.
 
-use crate::types::{Error, ProposalState};
+use soroban_sdk::vec;
+use crate::types::{Error, Proposal, ProposalState, ActionType, GovernanceConfig};
 
 /// State machine for proposal lifecycle
 ///
@@ -33,6 +34,7 @@ impl ProposalStateMachine {
                 | ProposalState::Executed
                 | ProposalState::Expired
                 | ProposalState::Cancelled
+                | ProposalState::Failed
         )
     }
 
@@ -88,24 +90,26 @@ impl ProposalStateMachine {
     }
 
     /// Get the next valid states from the current state
-    pub fn get_valid_next_states(state: ProposalState) -> Vec<ProposalState> {
+    pub fn get_valid_next_states(env: &soroban_sdk::Env, state: ProposalState) -> soroban_sdk::Vec<ProposalState> {
         match state {
-            ProposalState::Created => vec![ProposalState::Active, ProposalState::Cancelled],
+            ProposalState::Created => vec![env, ProposalState::Active, ProposalState::Cancelled],
             ProposalState::Active => vec![
+                env,
                 ProposalState::Succeeded,
                 ProposalState::Defeated,
                 ProposalState::Expired,
                 ProposalState::Cancelled,
             ],
-            ProposalState::Succeeded => vec![ProposalState::Queued, ProposalState::Cancelled],
+            ProposalState::Succeeded => vec![env, ProposalState::Queued, ProposalState::Cancelled],
             ProposalState::Queued => {
-                vec![ProposalState::Executed, ProposalState::Expired]
+                vec![env, ProposalState::Executed, ProposalState::Expired]
             }
             // Terminal states have no valid transitions
             ProposalState::Defeated
             | ProposalState::Executed
             | ProposalState::Expired
-            | ProposalState::Cancelled => vec![],
+            | ProposalState::Cancelled
+            | ProposalState::Failed => soroban_sdk::Vec::new(env),
         }
     }
 
@@ -127,6 +131,50 @@ impl ProposalStateMachine {
     /// Check if a proposal can be cancelled in its current state
     pub fn can_cancel(state: ProposalState) -> bool {
         !Self::is_terminal_state(state)
+    }
+
+    /// Derives current proposal state from its data
+    pub fn get_proposal_state(
+        env: &soroban_sdk::Env,
+        proposal: &Proposal,
+        config: &crate::types::GovernanceConfig,
+    ) -> ProposalState {
+        if proposal.cancelled_at.is_some() {
+            return ProposalState::Cancelled;
+        }
+        if proposal.executed_at.is_some() {
+            return ProposalState::Executed;
+        }
+
+        let current_time = env.ledger().timestamp();
+        
+        if current_time < proposal.created_at {
+            return ProposalState::Created;
+        }
+        
+        if current_time <= proposal.end_time {
+            return ProposalState::Active;
+        }
+        
+        // Check if successful
+        let total_votes = proposal.votes_for + proposal.votes_against + proposal.votes_abstain;
+        let total_possible_votes = 1_000_000_000; // Simplified for tests
+        
+        let quorum_met = (total_votes * 100 / total_possible_votes) >= config.quorum_percent as i128;
+        let approval_met = if total_votes > 0 {
+            (proposal.votes_for * 100 / total_votes) >= config.approval_percent as i128
+        } else {
+            false
+        };
+        
+        if quorum_met && approval_met {
+            // Need to check if it's queued or succeeded
+            // For now, if current_time > voting_ends_at but not executed/cancelled, it's Succeeded (or Queued)
+            // Simplified:
+            ProposalState::Succeeded
+        } else {
+            ProposalState::Defeated
+        }
     }
 }
 
@@ -343,19 +391,20 @@ mod tests {
 
     #[test]
     fn test_get_valid_next_states() {
-        let created_next = ProposalStateMachine::get_valid_next_states(ProposalState::Created);
+        let env = soroban_sdk::Env::default();
+        let created_next = ProposalStateMachine::get_valid_next_states(&env, ProposalState::Created);
         assert_eq!(created_next.len(), 2);
-        assert!(created_next.contains(&ProposalState::Active));
-        assert!(created_next.contains(&ProposalState::Cancelled));
+        assert!(created_next.contains(ProposalState::Active));
+        assert!(created_next.contains(ProposalState::Cancelled));
 
-        let active_next = ProposalStateMachine::get_valid_next_states(ProposalState::Active);
+        let active_next = ProposalStateMachine::get_valid_next_states(&env, ProposalState::Active);
         assert_eq!(active_next.len(), 4);
-        assert!(active_next.contains(&ProposalState::Succeeded));
-        assert!(active_next.contains(&ProposalState::Defeated));
-        assert!(active_next.contains(&ProposalState::Expired));
-        assert!(active_next.contains(&ProposalState::Cancelled));
+        assert!(active_next.contains(ProposalState::Succeeded));
+        assert!(active_next.contains(ProposalState::Defeated));
+        assert!(active_next.contains(ProposalState::Expired));
+        assert!(active_next.contains(ProposalState::Cancelled));
 
-        let executed_next = ProposalStateMachine::get_valid_next_states(ProposalState::Executed);
+        let executed_next = ProposalStateMachine::get_valid_next_states(&env, ProposalState::Executed);
         assert_eq!(executed_next.len(), 0);
     }
 

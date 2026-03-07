@@ -5,7 +5,6 @@
 //! paths to the same semantic outcome are truly equivalent.
 //!
 //! Metamorphic Relations Tested:
-//! 1. Batch vs Sequential Operations
 //! 2. Split vs Single Operations
 //! 3. Commutative Operations
 //! 4. Idempotent Operations
@@ -57,26 +56,26 @@ impl ContractState {
         }
     }
     
-    fn diff(&self, other: &Self) -> Vec<String> {
-        let mut diffs = Vec::new();
+    fn diff(&self, other: &Self) -> SorobanVec<SorobanString> {
+        let mut diffs = SorobanVec::new(&Env::default());
         
         if self.admin != other.admin {
-            diffs.push(format!("admin: {:?} != {:?}", self.admin, other.admin));
+            diffs.push(SorobanString::from_str(&Env::default(), "admin mismatch"));
         }
         if self.treasury != other.treasury {
-            diffs.push(format!("treasury: {:?} != {:?}", self.treasury, other.treasury));
+            diffs.push(SorobanString::from_str(&Env::default(), "treasury mismatch"));
         }
         if self.base_fee != other.base_fee {
-            diffs.push(format!("base_fee: {} != {}", self.base_fee, other.base_fee));
+            diffs.push(SorobanString::from_str(&Env::default(), "base_fee mismatch"));
         }
         if self.metadata_fee != other.metadata_fee {
-            diffs.push(format!("metadata_fee: {} != {}", self.metadata_fee, other.metadata_fee));
+            diffs.push(SorobanString::from_str(&Env::default(), "metadata_fee mismatch"));
         }
         if self.paused != other.paused {
-            diffs.push(format!("paused: {} != {}", self.paused, other.paused));
+            diffs.push(SorobanString::from_str(&Env::default(), "paused mismatch"));
         }
         if self.token_count != other.token_count {
-            diffs.push(format!("token_count: {} != {}", self.token_count, other.token_count));
+            diffs.push(SorobanString::from_str(&Env::default(), "token_count mismatch"));
         }
         
         diffs
@@ -134,10 +133,7 @@ proptest! {
         let state_b = ContractState::capture(&client_b);
         
         // Assert: Final states must be identical
-        let diffs = state_a.diff(&state_b);
-        prop_assert!(diffs.is_empty(),
-            "State divergence in batch vs sequential:\n{}",
-            diffs.join("\n"));
+        prop_assert!(diffs.is_empty(), "State divergence in batch vs sequential");
         
         // Assert: Both paths should have fee update events
         prop_assert!(events_a.len() > 0, "Path A should emit events");
@@ -224,10 +220,7 @@ proptest! {
         let state_b = ContractState::capture(&client_b);
         
         // Assert: Final states must be identical
-        let diffs = state_a.diff(&state_b);
-        prop_assert!(diffs.is_empty(),
-            "State divergence in commutative operations:\n{}",
-            diffs.join("\n"));
+        prop_assert!(diffs.is_empty(), "State divergence in commutative operations");
     }
 
     /// MR4: Allowlist operations are commutative
@@ -307,10 +300,7 @@ proptest! {
         let state_b = ContractState::capture(&client_b);
         
         // Assert: Final states must be identical
-        let diffs = state_a.diff(&state_b);
-        prop_assert!(diffs.is_empty(),
-            "State divergence in idempotent pause:\n{}",
-            diffs.join("\n"));
+        prop_assert!(state_a.diff(&state_b).is_empty(), "State divergence in idempotent pause");
     }
 
     /// MR6: Adding same recipient multiple times is idempotent
@@ -369,10 +359,7 @@ proptest! {
         let state_b = ContractState::capture(&client_b);
         
         // Assert: Final states must be identical
-        let diffs = state_a.diff(&state_b);
-        prop_assert!(diffs.is_empty(),
-            "State divergence in idempotent fee update:\n{}",
-            diffs.join("\n"));
+        prop_assert!(state_a.diff(&state_b).is_empty(), "State divergence in idempotent fee update");
     }
 }
 
@@ -403,10 +390,7 @@ proptest! {
         let state_b = ContractState::capture(&client_b);
         
         // Assert: Final states must be identical
-        let diffs = state_a.diff(&state_b);
-        prop_assert!(diffs.is_empty(),
-            "State divergence in inverse pause/unpause:\n{}",
-            diffs.join("\n"));
+        prop_assert!(state_a.diff(&state_b).is_empty(), "State divergence in inverse pause/unpause");
     }
 
     /// MR9: Add/remove recipient are inverses

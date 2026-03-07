@@ -47,7 +47,10 @@ fn setup_token_with_freeze(
         created_at: env.ledger().timestamp(),
         clawback_enabled: false,
         freeze_enabled,
-    };
+            freeze_enabled: false,
+            is_paused: false,
+        
+        };
 
     env.as_contract(&client.address, || {
         env.storage()

@@ -54,7 +54,7 @@ fn test_proposal_created_event_topic_v1() {
         .iter()
         .find(|e| {
             if let Some(first_topic) = e.0.get(0) {
-                first_topic == soroban_sdk::Val::from(symbol_short!("prop_cr_v1"))
+                first_topic == soroban_sdk::Val::from(symbol_short!("prop_crv1"))
             } else {
                 false
             }
@@ -65,8 +65,8 @@ fn test_proposal_created_event_topic_v1() {
     assert_eq!(proposal_event.0.len(), 2, "proposal created event should have 2 topics");
     assert_eq!(
         proposal_event.0.get(0).unwrap(),
-        soroban_sdk::Val::from(symbol_short!("prop_cr_v1")),
-        "first topic must be 'prop_cr_v1'"
+        soroban_sdk::Val::from(symbol_short!("prop_crv1")),
+        "first topic must be 'prop_crv1'"
     );
 }
 
@@ -94,7 +94,7 @@ fn test_proposal_created_event_payload_schema() {
         .iter()
         .find(|e| {
             if let Some(first_topic) = e.0.get(0) {
-                first_topic == soroban_sdk::Val::from(symbol_short!("prop_cr_v1"))
+                first_topic == soroban_sdk::Val::from(symbol_short!("prop_crv1"))
             } else {
                 false
             }
@@ -126,7 +126,7 @@ fn test_proposal_created_event_exact_topic_name() {
     let events = env.events().all();
     let has_v1_event = events.iter().any(|e| {
         if let Some(first_topic) = e.0.get(0) {
-            first_topic == soroban_sdk::Val::from(symbol_short!("prop_cr_v1"))
+            first_topic == soroban_sdk::Val::from(symbol_short!("prop_crv1"))
         } else {
             false
         }
@@ -134,7 +134,7 @@ fn test_proposal_created_event_exact_topic_name() {
 
     assert!(
         has_v1_event,
-        "proposal created event must use versioned topic 'prop_cr_v1'"
+        "proposal created event must use versioned topic 'prop_crv1'"
     );
 }
 
@@ -164,7 +164,7 @@ fn test_vote_cast_event_topic_v1() {
         .iter()
         .find(|e| {
             if let Some(first_topic) = e.0.get(0) {
-                first_topic == soroban_sdk::Val::from(symbol_short!("vote_cs_v1"))
+                first_topic == soroban_sdk::Val::from(symbol_short!("vote_csv1"))
             } else {
                 false
             }
@@ -175,8 +175,8 @@ fn test_vote_cast_event_topic_v1() {
     assert_eq!(vote_event.0.len(), 2, "vote cast event should have 2 topics");
     assert_eq!(
         vote_event.0.get(0).unwrap(),
-        soroban_sdk::Val::from(symbol_short!("vote_cs_v1")),
-        "first topic must be 'vote_cs_v1'"
+        soroban_sdk::Val::from(symbol_short!("vote_csv1")),
+        "first topic must be 'vote_csv1'"
     );
 }
 
@@ -203,7 +203,7 @@ fn test_vote_cast_event_payload_schema() {
         .iter()
         .find(|e| {
             if let Some(first_topic) = e.0.get(0) {
-                first_topic == soroban_sdk::Val::from(symbol_short!("vote_cs_v1"))
+                first_topic == soroban_sdk::Val::from(symbol_short!("vote_csv1"))
             } else {
                 false
             }
@@ -237,7 +237,7 @@ fn test_vote_cast_event_exact_topic_name() {
     let events = env.events().all();
     let has_v1_event = events.iter().any(|e| {
         if let Some(first_topic) = e.0.get(0) {
-            first_topic == soroban_sdk::Val::from(symbol_short!("vote_cs_v1"))
+            first_topic == soroban_sdk::Val::from(symbol_short!("vote_csv1"))
         } else {
             false
         }
@@ -245,7 +245,7 @@ fn test_vote_cast_event_exact_topic_name() {
 
     assert!(
         has_v1_event,
-        "vote cast event must use versioned topic 'vote_cs_v1'"
+        "vote cast event must use versioned topic 'vote_csv1'"
     );
 }
 
@@ -274,7 +274,7 @@ fn test_proposal_queued_event_topic_v1() {
         .iter()
         .find(|e| {
             if let Some(first_topic) = e.0.get(0) {
-                first_topic == soroban_sdk::Val::from(symbol_short!("prop_qu_v1"))
+                first_topic == soroban_sdk::Val::from(symbol_short!("prop_quv1"))
             } else {
                 false
             }
@@ -285,8 +285,8 @@ fn test_proposal_queued_event_topic_v1() {
     assert_eq!(queue_event.0.len(), 2, "proposal queued event should have 2 topics");
     assert_eq!(
         queue_event.0.get(0).unwrap(),
-        soroban_sdk::Val::from(symbol_short!("prop_qu_v1")),
-        "first topic must be 'prop_qu_v1'"
+        soroban_sdk::Val::from(symbol_short!("prop_quv1")),
+        "first topic must be 'prop_quv1'"
     );
 }
 
@@ -310,7 +310,7 @@ fn test_proposal_queued_event_exact_topic_name() {
     let events = env.events().all();
     let has_v1_event = events.iter().any(|e| {
         if let Some(first_topic) = e.0.get(0) {
-            first_topic == soroban_sdk::Val::from(symbol_short!("prop_qu_v1"))
+            first_topic == soroban_sdk::Val::from(symbol_short!("prop_quv1"))
         } else {
             false
         }
@@ -318,7 +318,7 @@ fn test_proposal_queued_event_exact_topic_name() {
 
     assert!(
         has_v1_event,
-        "proposal queued event must use versioned topic 'prop_qu_v1'"
+        "proposal queued event must use versioned topic 'prop_quv1'"
     );
 }
 
@@ -348,7 +348,7 @@ fn test_proposal_executed_event_topic_v1() {
         .iter()
         .find(|e| {
             if let Some(first_topic) = e.0.get(0) {
-                first_topic == soroban_sdk::Val::from(symbol_short!("prop_ex_v1"))
+                first_topic == soroban_sdk::Val::from(symbol_short!("prop_exv1"))
             } else {
                 false
             }
@@ -359,8 +359,8 @@ fn test_proposal_executed_event_topic_v1() {
     assert_eq!(exec_event.0.len(), 2, "proposal executed event should have 2 topics");
     assert_eq!(
         exec_event.0.get(0).unwrap(),
-        soroban_sdk::Val::from(symbol_short!("prop_ex_v1")),
-        "first topic must be 'prop_ex_v1'"
+        soroban_sdk::Val::from(symbol_short!("prop_exv1")),
+        "first topic must be 'prop_exv1'"
     );
 }
 
@@ -386,7 +386,7 @@ fn test_proposal_executed_event_exact_topic_name() {
     let events = env.events().all();
     let has_v1_event = events.iter().any(|e| {
         if let Some(first_topic) = e.0.get(0) {
-            first_topic == soroban_sdk::Val::from(symbol_short!("prop_ex_v1"))
+            first_topic == soroban_sdk::Val::from(symbol_short!("prop_exv1"))
         } else {
             false
         }
@@ -394,7 +394,7 @@ fn test_proposal_executed_event_exact_topic_name() {
 
     assert!(
         has_v1_event,
-        "proposal executed event must use versioned topic 'prop_ex_v1'"
+        "proposal executed event must use versioned topic 'prop_exv1'"
     );
 }
 
@@ -422,7 +422,7 @@ fn test_proposal_cancelled_event_topic_v1() {
         .iter()
         .find(|e| {
             if let Some(first_topic) = e.0.get(0) {
-                first_topic == soroban_sdk::Val::from(symbol_short!("prop_ca_v1"))
+                first_topic == soroban_sdk::Val::from(symbol_short!("prop_cav1"))
             } else {
                 false
             }
@@ -433,8 +433,8 @@ fn test_proposal_cancelled_event_topic_v1() {
     assert_eq!(cancel_event.0.len(), 2, "proposal cancelled event should have 2 topics");
     assert_eq!(
         cancel_event.0.get(0).unwrap(),
-        soroban_sdk::Val::from(symbol_short!("prop_ca_v1")),
-        "first topic must be 'prop_ca_v1'"
+        soroban_sdk::Val::from(symbol_short!("prop_cav1")),
+        "first topic must be 'prop_cav1'"
     );
 }
 
@@ -458,7 +458,7 @@ fn test_proposal_cancelled_event_exact_topic_name() {
     let events = env.events().all();
     let has_v1_event = events.iter().any(|e| {
         if let Some(first_topic) = e.0.get(0) {
-            first_topic == soroban_sdk::Val::from(symbol_short!("prop_ca_v1"))
+            first_topic == soroban_sdk::Val::from(symbol_short!("prop_cav1"))
         } else {
             false
         }
@@ -466,7 +466,7 @@ fn test_proposal_cancelled_event_exact_topic_name() {
 
     assert!(
         has_v1_event,
-        "proposal cancelled event must use versioned topic 'prop_ca_v1'"
+        "proposal cancelled event must use versioned topic 'prop_cav1'"
     );
 }
 
@@ -504,10 +504,10 @@ fn test_all_governance_events_use_v1_topics() {
         .filter(|e| {
             if let Some(first_topic) = e.0.get(0) {
                 let topic_str = format!("{:?}", first_topic);
-                topic_str.contains("prop_cr_v1")
-                    || topic_str.contains("vote_cs_v1")
-                    || topic_str.contains("prop_qu_v1")
-                    || topic_str.contains("prop_ex_v1")
+                topic_str.contains("prop_crv1")
+                    || topic_str.contains("vote_csv1")
+                    || topic_str.contains("prop_quv1")
+                    || topic_str.contains("prop_exv1")
             } else {
                 false
             }
@@ -552,7 +552,7 @@ fn test_governance_event_topic_count() {
         .iter()
         .find(|e| {
             if let Some(first_topic) = e.0.get(0) {
-                first_topic == soroban_sdk::Val::from(symbol_short!("prop_cr_v1"))
+                first_topic == soroban_sdk::Val::from(symbol_short!("prop_crv1"))
             } else {
                 false
             }
@@ -560,7 +560,7 @@ fn test_governance_event_topic_count() {
         .expect("proposal created event should be emitted");
 
     // Proposal created event should have exactly 2 topics:
-    // 1. Event name (prop_cr_v1)
+    // 1. Event name (prop_crv1)
     // 2. Proposal ID
     assert_eq!(
         proposal_event.0.len(),

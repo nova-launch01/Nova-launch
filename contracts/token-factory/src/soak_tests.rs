@@ -52,7 +52,11 @@ fn create_test_token(
     let token_info = crate::types::TokenInfo {
         address: token_address.clone(),
         creator: creator.clone(),
-        name: String::from_str(env, &format!("Token {}", index)),
+        name: String::from_str(env, &format!("Token {,
+            freeze_enabled: false,
+            is_paused: false,
+        
+        }", index)),
         symbol: String::from_str(env, &format!("TK{}", index)),
         decimals: 7,
         total_supply: 1_000_000_0000000,

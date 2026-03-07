@@ -43,7 +43,10 @@ fn create_token_without_metadata(
         metadata_uri: None,
         created_at: env.ledger().timestamp(),
         clawback_enabled: false,
-    };
+            freeze_enabled: false,
+            is_paused: false,
+        
+        };
 
     let token_index = crate::storage::get_token_count(env);
     crate::storage::set_token_info(env, token_index, &token_info);

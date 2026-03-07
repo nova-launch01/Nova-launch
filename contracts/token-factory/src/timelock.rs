@@ -1,5 +1,5 @@
 use soroban_sdk::{Address, Bytes, Env, Vec};
-#[cfg(all(test, feature = "legacy-tests"))]
+#[cfg(test)]
 use soroban_sdk::testutils::Ledger;
 use crate::types::{Error, TimelockConfig, PendingChange, ChangeType, Proposal, ActionType, VoteChoice};
 use crate::storage;
@@ -349,7 +349,7 @@ pub fn get_timelock_config(env: &Env) -> TimelockConfig {
     storage::get_timelock_config(env)
 }
 
-#[cfg(all(test, feature = "legacy-tests"))]
+#[cfg(test)]
 mod tests {
     use super::*;
     use soroban_sdk::{testutils::{Address as _, Ledger, LedgerInfo}, Env};
@@ -506,10 +506,11 @@ pub fn create_proposal(
         proposer: proposer.clone(),
         action_type: action_type.clone(),
         payload,
+        description: soroban_sdk::String::from_str(env, "Proposal"),
+        created_at: current_time,
         start_time,
         end_time,
         eta,
-        created_at: current_time,
         votes_for: 0,
         votes_against: 0,
         votes_abstain: 0,
@@ -550,7 +551,7 @@ pub fn get_proposal(env: &Env, proposal_id: u64) -> Option<Proposal> {
 }
 
 
-#[cfg(all(test, feature = "legacy-tests"))]
+#[cfg(test)]
 mod proposal_tests {
     use super::*;
     use soroban_sdk::{testutils::Address as _, Env, vec};
@@ -580,7 +581,7 @@ mod proposal_tests {
         let end_time = start_time + 86400; // 1 day voting period
         let eta = end_time + 3600; // 1 hour after voting ends
         
-        let payload = vec![&env, 1u8, 2u8, 3u8];
+        let payload = Bytes::from_slice(&env, &[1u8, 2u8, 3u8]);
         
         let proposal_id = create_proposal(
             &env,
@@ -616,7 +617,7 @@ mod proposal_tests {
         let end_time = start_time + 86400;
         let eta = end_time + 3600;
         
-        let payload = vec![&env, 1u8, 2u8, 3u8];
+        let payload = Bytes::from_slice(&env, &[1u8, 2u8, 3u8]);
         
         let result = create_proposal(
             &env,
@@ -640,7 +641,7 @@ mod proposal_tests {
         let end_time = current_time + 86400;
         let eta = end_time + 3600;
         
-        let payload = vec![&env, 1u8, 2u8, 3u8];
+        let payload = Bytes::from_slice(&env, &[1u8, 2u8, 3u8]);
         
         let result = create_proposal(
             &env,
@@ -664,7 +665,7 @@ mod proposal_tests {
         let end_time = start_time - 10; // Before start
         let eta = end_time + 3600;
         
-        let payload = vec![&env, 1u8, 2u8, 3u8];
+        let payload = Bytes::from_slice(&env, &[1u8, 2u8, 3u8]);
         
         let result = create_proposal(
             &env,
@@ -688,7 +689,7 @@ mod proposal_tests {
         let end_time = start_time + 86400;
         let eta = end_time - 100; // Before end time
         
-        let payload = vec![&env, 1u8, 2u8, 3u8];
+        let payload = Bytes::from_slice(&env, &[1u8, 2u8, 3u8]);
         
         let result = create_proposal(
             &env,
@@ -713,9 +714,9 @@ mod proposal_tests {
         let eta = end_time + 3600;
         
         // Create payload larger than MAX_PAYLOAD_SIZE (1024 bytes)
-        let mut large_payload = vec![&env];
+        let mut large_payload = Bytes::new(&env);
         for _ in 0..1025 {
-            large_payload.push_back(1u8);
+            large_payload.append(&Bytes::from_slice(&env, &[1u8]));
         }
         
         let result = create_proposal(
@@ -741,9 +742,9 @@ mod proposal_tests {
         let eta = end_time + 3600;
         
         // Create payload exactly at MAX_PAYLOAD_SIZE (1024 bytes)
-        let mut max_payload = vec![&env];
+        let mut max_payload = Bytes::new(&env);
         for _ in 0..1024 {
-            max_payload.push_back(1u8);
+            max_payload.append(&Bytes::from_slice(&env, &[1u8]));
         }
         
         let proposal_id = create_proposal(
@@ -765,7 +766,7 @@ mod proposal_tests {
         let (env, admin) = setup_for_proposals();
         
         let current_time = env.ledger().timestamp();
-        let payload = vec![&env, 1u8, 2u8, 3u8];
+        let payload = Bytes::from_slice(&env, &[1u8, 2u8, 3u8]);
         
         // Create first proposal
         let proposal_id_1 = create_proposal(
@@ -808,7 +809,7 @@ mod proposal_tests {
         let start_time = current_time + 100;
         let end_time = start_time + 86400;
         let eta = end_time + 3600;
-        let payload = vec![&env, 1u8, 2u8, 3u8];
+        let payload = Bytes::from_slice(&env, &[1u8, 2u8, 3u8]);
         
         // Test all action types
         let action_types = vec![
@@ -855,7 +856,7 @@ mod proposal_tests {
         let end_time = start_time + 86400;
         let eta = end_time + 3600;
         
-        let empty_payload = vec![&env];
+        let empty_payload = Bytes::new(&env);
         
         let proposal_id = create_proposal(
             &env,
@@ -980,7 +981,7 @@ pub fn vote_proposal(
 /// # Returns
 /// * `Some((u32, u32, u32))` - (votes_for, votes_against, votes_abstain)
 /// * `None` - If proposal doesn't exist
-pub fn get_vote_counts(env: &Env, proposal_id: u64) -> Option<(u32, u32, u32)> {
+pub fn get_vote_counts(env: &Env, proposal_id: u64) -> Option<(i128, i128, i128)> {
     storage::get_proposal(env, proposal_id)
         .map(|p| (p.votes_for, p.votes_against, p.votes_abstain))
 }
@@ -1032,8 +1033,10 @@ pub fn finalize_proposal(
     }
 
     // Only finalize Active proposals
-    if proposal.state != crate::types::ProposalState::Active {
-        return Ok(()); // Already finalized
+    let config = storage::get_governance_config(env);
+    let current_state = ProposalStateMachine::get_proposal_state(env, &proposal, &config);
+    if current_state != crate::types::ProposalState::Active {
+        return Ok(()); // Already finalized or in terminal state
     }
 
     // Determine outcome based on votes
@@ -1125,7 +1128,7 @@ pub fn queue_proposal(
     storage::set_proposal(env, proposal_id, &proposal);
 
     // Emit event
-    events::emit_proposal_queued(env, proposal_id, proposal.eta, current_time);
+    events::emit_proposal_queued(env, proposal_id, proposal.eta);
 
     Ok(())
 }
@@ -1185,8 +1188,10 @@ pub fn execute_proposal(
     }
 
     // Transition to Executed state
+    let config = storage::get_governance_config(env);
+    let current_state = ProposalStateMachine::get_proposal_state(env, &proposal, &config);
     ProposalStateMachine::validate_transition(
-        proposal.state,
+        current_state,
         crate::types::ProposalState::Executed
     )?;
     
@@ -1194,7 +1199,7 @@ pub fn execute_proposal(
     proposal.executed_at = Some(current_time);
     storage::set_proposal(env, proposal_id, &proposal);
 
-    events::emit_proposal_executed(env, proposal_id, proposal.action_type);
+    events::emit_proposal_executed(env, proposal_id, &env.current_contract_address(), true);
 
     Ok(())
 }

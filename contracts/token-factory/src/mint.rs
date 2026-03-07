@@ -153,7 +153,7 @@ pub fn get_remaining_mintable(env: &Env, token_index: u32) -> Option<i128> {
     })
 }
 
-#[cfg(all(test, feature = "legacy-tests"))]
+#[cfg(test)]
 mod tests {
     use super::*;
     use soroban_sdk::{testutils::Address as _, Env};
@@ -235,6 +235,9 @@ mod tests {
             metadata_uri: None,
             created_at: env.ledger().timestamp(),
             clawback_enabled: false,
+            freeze_enabled: false,
+            is_paused: false,
+        
         };
         
         storage::set_token_info(&env, 0, &token_info);
@@ -268,6 +271,9 @@ mod tests {
             metadata_uri: None,
             created_at: env.ledger().timestamp(),
             clawback_enabled: false,
+            freeze_enabled: false,
+            is_paused: false,
+        
         };
         
         storage::set_token_info(&env, 0, &token_info);
@@ -301,6 +307,9 @@ mod tests {
             metadata_uri: None,
             created_at: env.ledger().timestamp(),
             clawback_enabled: false,
+            freeze_enabled: false,
+            is_paused: false,
+        
         };
         
         storage::set_token_info(&env, 0, &token_info);
@@ -334,6 +343,9 @@ mod tests {
             metadata_uri: None,
             created_at: env.ledger().timestamp(),
             clawback_enabled: false,
+            freeze_enabled: false,
+            is_paused: false,
+        
         };
         
         storage::set_token_info(&env, 0, &token_info);
@@ -362,6 +374,9 @@ mod tests {
             metadata_uri: None,
             created_at: env.ledger().timestamp(),
             clawback_enabled: false,
+            freeze_enabled: false,
+            is_paused: false,
+        
         };
         
         storage::set_token_info(&env, 0, &token_info);
@@ -390,6 +405,9 @@ mod tests {
             metadata_uri: None,
             created_at: env.ledger().timestamp(),
             clawback_enabled: false,
+            freeze_enabled: false,
+            is_paused: false,
+        
         };
         
         storage::set_token_info(&env, 0, &token_info);
@@ -417,6 +435,9 @@ mod tests {
             metadata_uri: None,
             created_at: env.ledger().timestamp(),
             clawback_enabled: false,
+            freeze_enabled: false,
+            is_paused: false,
+        
         };
         
         storage::set_token_info(&env, 0, &token_info);
@@ -443,6 +464,9 @@ mod tests {
             metadata_uri: None,
             created_at: env.ledger().timestamp(),
             clawback_enabled: false,
+            freeze_enabled: false,
+            is_paused: false,
+        
         };
         
         storage::set_token_info(&env, 0, &token_info);
@@ -469,6 +493,9 @@ mod tests {
             metadata_uri: None,
             created_at: env.ledger().timestamp(),
             clawback_enabled: false,
+            freeze_enabled: false,
+            is_paused: false,
+        
         };
         
         storage::set_token_info(&env, 0, &token_info);

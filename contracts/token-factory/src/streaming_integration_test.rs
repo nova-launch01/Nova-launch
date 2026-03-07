@@ -33,6 +33,8 @@ mod streaming_integration_tests {
             created_at: env.ledger().timestamp(),
             is_paused: false,
             clawback_enabled: false,
+            freeze_enabled: false,
+        
         };
         storage::set_token_info(&env, 0, &token_info);
 

@@ -1,24 +1,8 @@
 use soroban_sdk::{contracttype, Address, String, Vec};
-use crate::types::{Error, PaginationCursor};
+use crate::types::{Error, PaginationCursor, StreamInfo};
 
-/// Stream information with optional metadata
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct StreamInfo {
-    pub id: u32,
-    pub creator: Address,
-    pub recipient: Address,
-    pub token_index: u32,
-    pub amount: i128,
-    pub start_time: u64,
-    pub end_time: u64,
-    pub claimed_amount: i128,
-    pub metadata: Option<String>,
-    pub created_at: u64,
-    pub claimed: bool,
-    pub paused: bool,
-    pub cancelled: bool,
-}
+// Stream types are defined in types.rs
+// pub struct StreamInfo { ... }
 
 /// Metadata update request - only metadata can be changed
 #[contracttype]
@@ -38,8 +22,9 @@ pub struct MetadataUpdate {
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PaginatedStreams {
-    pub streams: Vec<StreamInfo>,
-    pub cursor: Option<PaginationCursor>,
+    pub streams: soroban_sdk::Vec<StreamInfo>,
+    pub has_more: bool,
+    pub cursor: PaginationCursor,
 }
 
 /// Validate stream metadata length (max 512 chars)
@@ -77,7 +62,7 @@ pub fn validate_financial_invariants(
     updated: &StreamInfo,
 ) -> Result<(), Error> {
     // Verify immutable financial terms
-    if original.amount != updated.amount {
+    if original.total_amount != updated.total_amount {
         return Err(Error::InvalidParameters);
     }
     
@@ -86,10 +71,6 @@ pub fn validate_financial_invariants(
     }
     
     if original.recipient != updated.recipient {
-        return Err(Error::InvalidParameters);
-    }
-    
-    if original.created_at != updated.created_at {
         return Err(Error::InvalidParameters);
     }
     
@@ -148,7 +129,7 @@ pub fn calculate_claimable_amount(stream: &StreamInfo, current_time: u64) -> i12
     
     // After end time: everything is vested
     if current_time >= stream.end_time {
-        let vested = stream.amount;
+        let vested = stream.total_amount;
         let claimable = vested.saturating_sub(stream.claimed_amount);
         return claimable.max(0);
     }
@@ -162,9 +143,9 @@ pub fn calculate_claimable_amount(stream: &StreamInfo, current_time: u64) -> i12
         return 0;
     }
     
-    // Calculate vested amount: (amount * elapsed) / duration
+    // Calculate vested amount: (total_amount * elapsed) / duration
     // Use checked arithmetic to prevent overflow
-    let vested = stream.amount
+    let vested = stream.total_amount
         .saturating_mul(elapsed as i128)
         .saturating_div(duration as i128);
     
