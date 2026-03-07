@@ -67,10 +67,104 @@ pub fn create_stream(
     Ok(stream_id)
 }
 
+#[cfg(test)]
+mod deterministic_batch_event_tests {
+    use super::*;
+    use soroban_sdk::{symbol_short, testutils::{Address as _, Events, Ledger}, Env, Val};
+
+    fn setup_env() -> (Env, Address, Address) {
+        let env = Env::default();
+        env.mock_all_auths();
+        let creator = Address::generate(&env);
+        let recipient = Address::generate(&env);
+        (env, creator, recipient)
+    }
+
+    #[test]
+    fn batch_claim_emits_claim_events_in_input_order() {
+        let (env, creator, recipient) = setup_env();
+        env.ledger().with_mut(|li| li.timestamp = 1_000);
+
+        let stream1 = StreamInfo {
+            id: 1,
+            creator: creator.clone(),
+            recipient: recipient.clone(),
+            token_index: 0,
+            total_amount: 1_000,
+            claimed_amount: 0,
+            start_time: 0,
+            end_time: 100,
+            cliff_time: 0,
+            cancelled: false,
+            paused: false,
+        };
+        let stream2 = StreamInfo { id: 2, ..stream1.clone() };
+
+        storage::set_stream(&env, 1, &stream1);
+        storage::set_stream(&env, 2, &stream2);
+
+        let before = env.events().all().len();
+        let ids = soroban_sdk::vec![&env, 1u64, 2u64];
+        let claimed = batch_claim(&env, &recipient, &ids).unwrap();
+        assert_eq!(claimed.len(), 2);
+
+        let all = env.events().all();
+        let delta = all.slice(before as u32, all.len());
+        assert_eq!(delta.len(), 2);
+        assert_eq!(delta.get(0).unwrap().0.get(0).unwrap(), Val::from(symbol_short!("strm_clm")));
+        assert_eq!(delta.get(1).unwrap().0.get(0).unwrap(), Val::from(symbol_short!("strm_clm")));
+    }
+
+    #[test]
+    fn batch_claim_failure_emits_no_partial_claim_events() {
+        let (env, creator, recipient) = setup_env();
+        let other_recipient = Address::generate(&env);
+        env.ledger().with_mut(|li| li.timestamp = 1_000);
+
+        let stream1 = StreamInfo {
+            id: 11,
+            creator: creator.clone(),
+            recipient: recipient.clone(),
+            token_index: 0,
+            total_amount: 1_000,
+            claimed_amount: 0,
+            start_time: 0,
+            end_time: 100,
+            cliff_time: 0,
+            cancelled: false,
+            paused: false,
+        };
+        let stream2 = StreamInfo {
+            id: 12,
+            recipient: other_recipient,
+            ..stream1.clone()
+        };
+
+        storage::set_stream(&env, 11, &stream1);
+        storage::set_stream(&env, 12, &stream2);
+
+        let before = env.events().all().len();
+        let ids = soroban_sdk::vec![&env, 11u64, 12u64];
+        let err = batch_claim(&env, &recipient, &ids).unwrap_err();
+        assert_eq!(err, Error::Unauthorized);
+
+        assert_eq!(env.events().all().len(), before, "failed batch must not leak claim events");
+        assert_eq!(storage::get_stream(&env, 11).unwrap().claimed_amount, 0);
+        assert_eq!(storage::get_stream(&env, 12).unwrap().claimed_amount, 0);
+    }
+}
+
 /// Batch create streams
 ///
 /// Creates multiple payment streams in a single transaction.
 /// All-or-nothing atomicity: if any stream is invalid, entire batch fails.
+///
+/// # Event ordering contract (deterministic)
+/// Successful batch emits:
+/// 1. one `strm_crt` event per created stream in input order
+/// 2. one trailing `bch_strm` summary event
+///
+/// Failed batch emits none of these success events.
 ///
 /// # Arguments
 /// * `env` - The contract environment
@@ -281,6 +375,11 @@ pub fn claim_stream(
 /// Allows recipient to claim tokens that have vested according to schedule
 /// from multiple streams in a single transaction. Streams that cannot be
 /// claimed (e.g. before cliff or zero remaining) are skipped without error.
+///
+/// # Event ordering contract (deterministic)
+/// Successful batch emits `strm_clm` events in the same order as `stream_ids`
+/// for claimable streams only (non-claimable streams are skipped without event).
+/// If validation fails in phase 1, no `strm_clm` events are emitted.
 ///
 /// # Arguments
 /// * `env` - The contract environment

@@ -1203,3 +1203,126 @@ pub fn execute_proposal(
 
     Ok(())
 }
+
+#[cfg(test)]
+mod deterministic_governance_event_order_tests {
+    use super::*;
+    use soroban_sdk::{symbol_short, testutils::{Address as _, Events, Ledger}, vec, Address, Env, Val};
+
+    fn setup() -> (Env, Address) {
+        let env = Env::default();
+        env.mock_all_auths();
+        let admin = Address::generate(&env);
+        storage::set_admin(&env, &admin);
+        storage::set_treasury(&env, &Address::generate(&env));
+        storage::set_base_fee(&env, 1_000_000);
+        storage::set_metadata_fee(&env, 500_000);
+        initialize_timelock(&env, Some(3600)).unwrap();
+        (env, admin)
+    }
+
+    fn topic0(event: &(soroban_sdk::Vec<Val>, Val)) -> Val {
+        event.0.get(0).unwrap()
+    }
+
+    #[test]
+    fn governance_flow_emits_exact_deterministic_sequence() {
+        let (env, admin) = setup();
+        let now = env.ledger().timestamp();
+        let start = now + 10;
+        let end = start + 100;
+        let eta = end + 20;
+
+        // len >= 8 triggers fee update action event in execute path.
+        let payload = vec![&env, 1u8, 2u8, 3u8, 4u8, 5u8, 6u8, 7u8];
+
+        let before = env.events().all().len();
+        let proposal_id = create_proposal(&env, &admin, ActionType::FeeChange, payload, start, end, eta).unwrap();
+
+        env.ledger().with_mut(|li| li.timestamp = start + 1);
+        let voter1 = Address::generate(&env);
+        let voter2 = Address::generate(&env);
+        vote_proposal(&env, &voter1, proposal_id, VoteChoice::For).unwrap();
+        vote_proposal(&env, &voter2, proposal_id, VoteChoice::For).unwrap();
+
+        env.ledger().with_mut(|li| li.timestamp = end + 1);
+        queue_proposal(&env, proposal_id).unwrap();
+
+        env.ledger().with_mut(|li| li.timestamp = eta + 1);
+        execute_proposal(&env, proposal_id).unwrap();
+
+        let all = env.events().all();
+        let delta = all.slice(before as u32, all.len());
+        let topics: soroban_sdk::Vec<Val> = soroban_sdk::vec![
+            &env,
+            topic0(&delta.get(0).unwrap()),
+            topic0(&delta.get(1).unwrap()),
+            topic0(&delta.get(2).unwrap()),
+            topic0(&delta.get(3).unwrap()),
+            topic0(&delta.get(4).unwrap()),
+            topic0(&delta.get(5).unwrap()),
+        ];
+
+        assert_eq!(topics.get(0).unwrap(), Val::from(symbol_short!("prop_cr_v1")));
+        assert_eq!(topics.get(1).unwrap(), Val::from(symbol_short!("vote_cs_v1")));
+        assert_eq!(topics.get(2).unwrap(), Val::from(symbol_short!("vote_cs_v1")));
+        assert_eq!(topics.get(3).unwrap(), Val::from(symbol_short!("prop_qu_v1")));
+        assert_eq!(topics.get(4).unwrap(), Val::from(symbol_short!("fee_up_v1")));
+        assert_eq!(topics.get(5).unwrap(), Val::from(symbol_short!("prop_ex_v1")));
+    }
+
+    #[test]
+    fn failed_queue_does_not_emit_partial_queue_event() {
+        let (env, admin) = setup();
+        let now = env.ledger().timestamp();
+        let start = now + 10;
+        let end = start + 100;
+        let eta = end + 20;
+        let payload = vec![&env, 1u8];
+
+        let proposal_id = create_proposal(&env, &admin, ActionType::FeeChange, payload, start, end, eta).unwrap();
+        env.ledger().with_mut(|li| li.timestamp = start + 1);
+        let voter1 = Address::generate(&env);
+        let voter2 = Address::generate(&env);
+        vote_proposal(&env, &voter1, proposal_id, VoteChoice::For).unwrap();
+        vote_proposal(&env, &voter2, proposal_id, VoteChoice::Against).unwrap();
+
+        env.ledger().with_mut(|li| li.timestamp = end + 1);
+        let queue_event_count_before = env.events().all().iter().filter(|e| topic0(e) == Val::from(symbol_short!("prop_qu_v1"))).count();
+        let err = queue_proposal(&env, proposal_id).unwrap_err();
+        assert_eq!(err, Error::QuorumNotMet);
+        let queue_event_count_after = env.events().all().iter().filter(|e| topic0(e) == Val::from(symbol_short!("prop_qu_v1"))).count();
+        assert_eq!(queue_event_count_before, queue_event_count_after);
+    }
+
+    #[test]
+    fn failed_execute_before_eta_emits_no_execute_or_action_event() {
+        let (env, admin) = setup();
+        let now = env.ledger().timestamp();
+        let start = now + 10;
+        let end = start + 100;
+        let eta = end + 20;
+        let payload = vec![&env, 1u8, 2u8, 3u8, 4u8, 5u8, 6u8, 7u8];
+
+        let proposal_id = create_proposal(&env, &admin, ActionType::FeeChange, payload, start, end, eta).unwrap();
+        env.ledger().with_mut(|li| li.timestamp = start + 1);
+        let voter = Address::generate(&env);
+        vote_proposal(&env, &voter, proposal_id, VoteChoice::For).unwrap();
+        env.ledger().with_mut(|li| li.timestamp = end + 1);
+        queue_proposal(&env, proposal_id).unwrap();
+
+        env.ledger().with_mut(|li| li.timestamp = eta - 1);
+        let all_before = env.events().all();
+        let exec_before = all_before.iter().filter(|e| topic0(e) == Val::from(symbol_short!("prop_ex_v1"))).count();
+        let fee_before = all_before.iter().filter(|e| topic0(e) == Val::from(symbol_short!("fee_up_v1"))).count();
+
+        let err = execute_proposal(&env, proposal_id).unwrap_err();
+        assert_eq!(err, Error::TimelockNotExpired);
+
+        let all_after = env.events().all();
+        let exec_after = all_after.iter().filter(|e| topic0(e) == Val::from(symbol_short!("prop_ex_v1"))).count();
+        let fee_after = all_after.iter().filter(|e| topic0(e) == Val::from(symbol_short!("fee_up_v1"))).count();
+        assert_eq!(exec_before, exec_after);
+        assert_eq!(fee_before, fee_after);
+    }
+}

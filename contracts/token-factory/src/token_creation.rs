@@ -154,6 +154,16 @@ pub fn create_token(
 /// 
 /// All tokens are created in a single transaction with atomic semantics.
 /// If any token fails validation, the entire batch is rolled back.
+///
+/// # Event ordering contract (deterministic)
+/// For a successful batch of `N` tokens, events are emitted strictly as:
+/// 1. `tok_crt` for token[0]
+/// 2. `tok_crt` for token[1]
+/// 3. ...
+/// 4. `tok_crt` for token[N-1]
+/// 5. `bch_tkn` batch summary
+///
+/// Failed batches emit none of the above success events.
 /// 
 /// # Arguments
 /// * `creator` - Address creating the tokens (must authorize)
@@ -241,7 +251,7 @@ pub fn batch_create_tokens(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use soroban_sdk::{testutils::Address as _, Env};
+    use soroban_sdk::{symbol_short, testutils::{Address as _, Events}, Env, Val};
 
     fn setup_test_env() -> (Env, Address, Address) {
         let env = Env::default();
@@ -321,5 +331,69 @@ mod tests {
         let (env, _, _) = setup_test_env();
         let fee = calculate_creation_fee(&env, true);
         assert_eq!(fee, 150);
+    }
+
+    #[test]
+    fn test_batch_create_emits_exact_sequence_in_input_order() {
+        let (env, admin, _treasury) = setup_test_env();
+        let before = env.events().all().len();
+
+        let token_a = TokenCreationParams {
+            name: String::from_str(&env, "Alpha"),
+            symbol: String::from_str(&env, "ALP"),
+            decimals: 7,
+            initial_supply: 1_000_000,
+            metadata_uri: None,
+        };
+        let token_b = TokenCreationParams {
+            name: String::from_str(&env, "Beta"),
+            symbol: String::from_str(&env, "BET"),
+            decimals: 7,
+            initial_supply: 2_000_000,
+            metadata_uri: None,
+        };
+
+        let batch = soroban_sdk::vec![&env, token_a, token_b];
+        let fee = 2 * calculate_creation_fee(&env, false);
+        let created = batch_create_tokens(&env, admin, batch, fee).unwrap();
+        assert_eq!(created.len(), 2);
+
+        let all = env.events().all();
+        let delta = all.slice(before as u32, all.len());
+        assert_eq!(delta.len(), 3, "expected 2 create events + 1 batch summary");
+
+        assert_eq!(delta.get(0).unwrap().0.get(0).unwrap(), Val::from(symbol_short!("tok_crt")));
+        assert_eq!(delta.get(1).unwrap().0.get(0).unwrap(), Val::from(symbol_short!("tok_crt")));
+        assert_eq!(delta.get(2).unwrap().0.get(0).unwrap(), Val::from(symbol_short!("bch_tkn")));
+    }
+
+    #[test]
+    fn test_batch_create_rollback_emits_no_partial_success_events() {
+        let (env, admin, _treasury) = setup_test_env();
+        let before = env.events().all().len();
+        let token_count_before = storage::get_token_count(&env);
+
+        let valid = TokenCreationParams {
+            name: String::from_str(&env, "Valid"),
+            symbol: String::from_str(&env, "VLD"),
+            decimals: 7,
+            initial_supply: 1_000_000,
+            metadata_uri: None,
+        };
+        let invalid = TokenCreationParams {
+            name: String::from_str(&env, ""), // invalid -> forces rollback path
+            symbol: String::from_str(&env, "BAD"),
+            decimals: 7,
+            initial_supply: 1_000_000,
+            metadata_uri: None,
+        };
+
+        let batch = soroban_sdk::vec![&env, valid, invalid];
+        let fee = 2 * calculate_creation_fee(&env, false);
+        let err = batch_create_tokens(&env, admin, batch, fee).unwrap_err();
+        assert_eq!(err, Error::InvalidTokenParams);
+
+        assert_eq!(storage::get_token_count(&env), token_count_before);
+        assert_eq!(env.events().all().len(), before, "no partial success event leakage allowed");
     }
 }
