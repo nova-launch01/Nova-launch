@@ -400,6 +400,26 @@ pub fn emit_treasury_policy_updated(env: &Env, daily_cap: i128, allowlist_enable
     );
 }
 
+/// Emit governance configured event
+///
+/// Emitted when governance parameters are initialized
+pub fn emit_governance_configured(env: &Env, quorum_percent: u32, approval_percent: u32) {
+    env.events().publish(
+        (symbol_short!("gov_cfg"),),
+        (quorum_percent, approval_percent),
+    );
+}
+
+/// Emit governance updated event
+///
+/// Emitted when governance parameters are changed
+pub fn emit_governance_updated(env: &Env, quorum_percent: u32, approval_percent: u32) {
+    env.events().publish(
+        (symbol_short!("gov_upd"),),
+        (quorum_percent, approval_percent),
+    );
+}
+
 /// Emit stream metadata updated event (v1)
 /// 
 /// **Schema Version**: 1

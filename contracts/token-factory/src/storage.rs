@@ -1021,3 +1021,23 @@ pub fn is_address_frozen(_env: &Env, _token_address: &Address, _address: &Addres
 pub fn set_address_frozen(_env: &Env, _token_address: &Address, _address: &Address, _frozen: bool) {
     // Stub implementation
 }
+
+// ── Governance storage functions ───────────────────────────
+
+/// Get governance configuration
+pub fn get_governance_config(env: &Env) -> crate::types::GovernanceConfig {
+    env.storage()
+        .instance()
+        .get(&DataKey::GovernanceConfig)
+        .unwrap_or(crate::types::GovernanceConfig {
+            quorum_percent: 30,
+            approval_percent: 51,
+        })
+}
+
+/// Set governance configuration
+pub fn set_governance_config(env: &Env, config: &crate::types::GovernanceConfig) {
+    env.storage()
+        .instance()
+        .set(&DataKey::GovernanceConfig, config);
+}

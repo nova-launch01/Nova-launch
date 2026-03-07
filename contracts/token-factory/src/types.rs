@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use soroban_sdk::{contracterror, contracttype, Address, Bytes, String, Vec};
+use soroban_sdk::{contracterror, contracttype, Address, String, Vec};
 
 /// Factory state containing administrative configuration
 ///
@@ -84,20 +84,8 @@ pub struct TokenInfo {
     pub burn_count: u32,
     pub metadata_uri: Option<String>,
     pub created_at: u64,
+    pub is_paused: bool,   // NEW — token-level pause flag
     pub is_paused: bool,
-    pub clawback_enabled: bool,
-    pub freeze_enabled: bool,
-}
-
-/// Parameters for creating a new token
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct TokenCreationParams {
-    pub name: String,
-    pub symbol: String,
-    pub decimals: u32,
-    pub initial_supply: i128,
-    pub metadata_uri: Option<String>,
 }
 
 /// Compact read-only snapshot of a token's current state.
@@ -105,24 +93,15 @@ pub struct TokenCreationParams {
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TokenStats {
-    pub current_supply: i128,
+    pub current_supply: i128,  // live circulating supply
+    pub total_burned:   i128,  // cumulative amount burned since creation
+    pub burn_count:     u32,   // number of burn operations performed
+    pub is_paused:      bool,  // token-level pause flag
+    pub has_clawback:   bool,  // clawback policy flag (reserved; always false for now)
     pub total_burned: i128,
     pub burn_count: u32,
-    pub is_paused: bool,
-    pub has_clawback: bool,
     pub clawback_enabled: bool,
     pub freeze_enabled: bool,
-}
-
-/// Parameters for token creation in single/batch flows.
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct TokenCreationParams {
-    pub name: String,
-    pub symbol: String,
-    pub decimals: u32,
-    pub initial_supply: i128,
-    pub metadata_uri: Option<String>,
 }
 
 /// Batch fee update structure for Phase 2 optimization
@@ -170,17 +149,9 @@ pub struct FeeUpdate {
 /// * `NextChangeId` - Next available change ID
 /// * `CreatorTokens(Address)` - Vector of token indices for a creator
 /// * `CreatorTokenCount(Address)` - Number of tokens created by address
-/// * `TokenStreams(u32)` - Vector of stream IDs for a token
-/// * `TokenStreamCount(u32)` - Number of streams for a token
 /// * `TreasuryPolicy` - Treasury withdrawal policy
 /// * `WithdrawalPeriod` - Current withdrawal period tracking
 /// * `AllowedRecipient(Address)` - Whether address is allowed recipient
-/// * `StreamCount` - Total number of streams created
-/// * `Stream(u64)` - Stream info by ID
-/// * `NextStreamId` - Next available stream ID
-/// * `VoteSnapshot(u64)` - Vote snapshot by ID
-/// * `VoterWeight(u64, Address)` - Voter weight in snapshot (snapshot_id, voter)
-/// * `NextSnapshotId` - Next available snapshot ID
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum DataKey {
@@ -201,20 +172,14 @@ pub enum DataKey {
     NextChangeId,
     CreatorTokens(Address),
     CreatorTokenCount(Address),
-    TokenStreams(u32),
-    TokenStreamCount(u32),
     TreasuryPolicy,
     WithdrawalPeriod,
     AllowedRecipient(Address),
     // Stream management keys
     StreamCount,                    // Total number of streams created
-    Stream(u64),                    // Stream info by ID (using u64 for consistency)
-    NextStreamId,                   // Next available stream ID
-    // Governance proposal keys
-    ProposalCount,                  // Total number of proposals created
-    Proposal(u64),                  // Proposal by ID
-    NextProposalId,                 // Next available proposal ID
-    ProposalVote(u64, Address),     // Vote by proposal ID and voter address
+    Stream(u32),                    // Stream info by ID
+    StreamByCreator(Address, u32),  // Index streams by creator for pagination
+    GovernanceConfig,               // Governance quorum and approval thresholds
 }
 
 /// Contract error codes
@@ -243,15 +208,6 @@ pub enum DataKey {
 /// * `InvalidMaxSupply` - Max supply is less than initial supply
 /// * `WithdrawalCapExceeded` - Withdrawal would exceed daily cap
 /// * `RecipientNotAllowed` - Recipient not in allowlist
-/// * `ProposalNotFound` - Requested proposal does not exist
-/// * `VotingNotStarted` - Voting period has not begun yet
-/// * `VotingEnded` - Voting period has already ended
-/// * `AlreadyVoted` - Voter has already cast a vote on this proposal
-/// * `VotingClosed` - Voting is no longer accepting votes
-/// * `ProposalExpired` - Proposal has passed its expiration time
-/// * `ProposalNotExecutable` - Proposal cannot be executed in current state
-/// * `QuorumNotMet` - Proposal did not reach minimum quorum threshold
-/// * `AlreadyExecuted` - Proposal has already been executed
 ///
 /// # Examples
 /// ```
@@ -262,12 +218,12 @@ pub enum DataKey {
 #[contracterror]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Error {
-    InsufficientFee     = 1,
-    Unauthorized        = 2,
-    InvalidParameters   = 3,
-    TokenNotFound       = 4,
-    MetadataAlreadySet  = 5,
-    AlreadyInitialized  = 6,
+    InsufficientFee = 1,
+    Unauthorized = 2,
+    InvalidParameters = 3,
+    TokenNotFound = 4,
+    MetadataAlreadySet = 5,
+    AlreadyInitialized = 6,
     InsufficientBalance = 7,
     ArithmeticError = 8,
     BatchTooLarge = 9,
@@ -287,6 +243,21 @@ pub enum Error {
     InvalidBaseFee = 23,
     InvalidMetadataFee = 24,
     InconsistentTokenCount = 25,
+    TokenPaused = 26,
+}
+
+/// Governance configuration
+///
+/// Defines quorum and approval thresholds for governance operations.
+///
+/// # Fields
+/// * `quorum_percent` - Minimum participation percentage (0-100)
+/// * `approval_percent` - Minimum approval percentage (0-100)
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct GovernanceConfig {
+    pub quorum_percent: u32,
+    pub approval_percent: u32,
 }
 
 /// Timelock configuration
@@ -312,102 +283,6 @@ pub enum ChangeType {
     FeeUpdate,
     PauseUpdate,
     TreasuryUpdate,
-}
-
-/// Type of governance action
-///
-/// Identifies the type of action proposed in a governance proposal.
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum ActionType {
-    FeeChange,
-    TreasuryChange,
-    PauseContract,
-    UnpauseContract,
-    PolicyUpdate,
-}
-
-/// Vote choice for a proposal
-///
-/// Represents the voter's position on a proposal.
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum VoteChoice {
-    For,
-    Against,
-    Abstain,
-}
-
-/// Governance proposal
-///
-/// Proposal lifecycle state
-///
-/// Defines the explicit state machine for proposal lifecycle.
-/// Transitions follow strict rules to prevent invalid state changes.
-///
-/// # State Transitions
-/// ```text
-/// Created -> Active -> Succeeded -> Queued -> Executed (terminal)
-///                   -> Defeated (terminal)
-///                   -> Expired (terminal)
-/// ```
-///
-/// # States
-/// * `Created` - Proposal created, voting not yet started
-/// * `Active` - Voting period is active
-/// * `Succeeded` - Voting ended, proposal passed (quorum met, more for than against)
-/// * `Defeated` - Voting ended, proposal failed (quorum not met or more against)
-/// * `Queued` - Proposal succeeded and queued for execution after timelock
-/// * `Executed` - Proposal has been executed (terminal state)
-/// * `Expired` - Proposal expired before execution (terminal state)
-/// * `Cancelled` - Proposal was cancelled by proposer or admin (terminal state)
-#[contracttype]
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum ProposalState {
-    Created = 0,
-    Active = 1,
-    Succeeded = 2,
-    Defeated = 3,
-    Queued = 4,
-    Executed = 5,
-    Expired = 6,
-    Cancelled = 7,
-}
-
-/// Represents a proposal for a governance action with voting period.
-///
-/// # Fields
-/// * `id` - Unique proposal identifier
-/// * `proposer` - Address that created the proposal
-/// * `action_type` - Type of action being proposed
-/// * `payload` - Encoded action payload (bounded to 1024 bytes)
-/// * `start_time` - Voting start timestamp
-/// * `end_time` - Voting end timestamp
-/// * `eta` - Estimated time of execution after approval
-/// * `created_at` - Timestamp when proposal was created
-/// * `votes_for` - Number of votes in favor
-/// * `votes_against` - Number of votes against
-/// * `votes_abstain` - Number of abstain votes
-/// * `state` - Current lifecycle state of the proposal
-/// * `executed_at` - Timestamp when proposal was executed (if applicable)
-/// * `cancelled_at` - Timestamp when proposal was cancelled (if applicable)
-#[contracttype]
-#[derive(Clone, Debug)]
-pub struct Proposal {
-    pub id: u64,
-    pub proposer: Address,
-    pub action_type: ActionType,
-    pub payload: Bytes,
-    pub start_time: u64,
-    pub end_time: u64,
-    pub eta: u64,
-    pub created_at: u64,
-    pub votes_for: u32,
-    pub votes_against: u32,
-    pub votes_abstain: u32,
-    pub state: ProposalState,
-    pub executed_at: Option<u64>,
-    pub cancelled_at: Option<u64>,
 }
 
 /// Pending change awaiting timelock expiry
@@ -465,8 +340,7 @@ pub struct PaginationCursor {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PaginatedTokens {
     pub tokens: soroban_sdk::Vec<TokenInfo>,
-    pub has_more: bool,
-    pub cursor: PaginationCursor,
+    pub cursor: Option<u32>,
 }
 
 /// Treasury withdrawal policy
@@ -499,69 +373,3 @@ pub struct WithdrawalPeriod {
     pub amount_withdrawn: i128,
 }
 
-/// Stream information
-///
-/// Contains all data for a payment stream including vesting schedule.
-///
-/// # Fields
-/// * `id` - Unique stream identifier
-/// * `creator` - Address that created the stream
-/// * `recipient` - Address that receives vested tokens
-/// * `token_index` - Index of the token being streamed
-/// * `total_amount` - Total amount to be vested
-/// * `claimed_amount` - Amount already claimed by recipient
-/// * `start_time` - Stream start timestamp
-/// * `end_time` - Stream end timestamp (full vesting)
-/// * `cliff_time` - Cliff timestamp (no claims before this)
-/// * `cancelled` - Whether the stream has been cancelled
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct StreamInfo {
-    pub id: u64,
-    pub creator: Address,
-    pub recipient: Address,
-    pub token_index: u32,
-    pub total_amount: i128,
-    pub claimed_amount: i128,
-    pub start_time: u64,
-    pub end_time: u64,
-    pub cliff_time: u64,
-    pub cancelled: bool,
-    pub paused: bool,
-}
-
-/// Stream creation parameters
-///
-/// Parameters for creating a new payment stream.
-///
-/// # Fields
-/// * `recipient` - Address that will receive vested tokens
-/// * `token_index` - Index of the token to stream
-/// * `total_amount` - Total amount to vest
-/// * `start_time` - Stream start timestamp
-/// * `end_time` - Stream end timestamp
-/// * `cliff_time` - Cliff timestamp
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct StreamParams {
-    pub recipient: Address,
-    pub token_index: u32,
-    pub total_amount: i128,
-    pub start_time: u64,
-    pub end_time: u64,
-    pub cliff_time: u64,
-}
-
-/// Timelock configuration
-///
-/// Defines the delay period for timelocked operations.
-///
-/// # Fields
-/// * `delay_seconds` - Delay in seconds before changes can be executed
-/// * `enabled` - Whether timelock is enabled
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct TimelockConfig {
-    pub delay_seconds: u64,
-    pub enabled: bool,
-}
