@@ -1,0 +1,188 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Token {
+  id            String   @id @default(uuid())
+  address       String   @unique
+  creator       String
+  name          String
+  symbol        String
+  decimals      Int      @default(18)
+  totalSupply   BigInt
+  initialSupply BigInt
+  totalBurned   BigInt   @default(0)
+  burnCount     Int      @default(0)
+  metadataUri   String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  burnRecords BurnRecord[]
+  analytics   Analytics[]
+
+  @@index([address])
+  @@index([creator])
+  @@index([createdAt])
+  @@index([totalSupply])
+  @@index([totalBurned])
+  @@index([burnCount])
+  @@index([name])
+  @@index([symbol])
+}
+
+model BurnRecord {
+  id         String   @id @default(uuid())
+  tokenId    String
+  from       String
+  amount     BigInt
+  burnedBy   String
+  isAdminBurn Boolean @default(false)
+  txHash     String   @unique
+  timestamp  DateTime @default(now())
+
+  token Token @relation(fields: [tokenId], references: [id])
+
+  @@index([tokenId])
+  @@index([from])
+  @@index([txHash])
+  @@index([timestamp])
+}
+
+model User {
+  id         String   @id @default(uuid())
+  address    String   @unique
+  createdAt  DateTime @default(now())
+  lastActive DateTime @updatedAt
+
+  @@index([address])
+}
+
+model Analytics {
+  id            String   @id @default(uuid())
+  tokenId       String
+  date          DateTime @db.Date
+  burnVolume    BigInt   @default(0)
+  burnCount     Int      @default(0)
+  uniqueBurners Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  token Token @relation(fields: [tokenId], references: [id])
+
+  @@unique([tokenId, date])
+  @@index([tokenId])
+  @@index([date])
+}
+
+model Stream {
+  id          String   @id @default(uuid())
+  streamId    Int      @unique
+  creator     String
+  recipient   String
+  amount      BigInt
+  metadata    String?
+  status      StreamStatus @default(CREATED)
+  txHash      String   @unique
+  createdAt   DateTime @default(now())
+  claimedAt   DateTime?
+  cancelledAt DateTime?
+
+  @@index([creator])
+  @@index([recipient])
+  @@index([status])
+  @@index([createdAt])
+}
+
+enum StreamStatus {
+  CREATED
+  CLAIMED
+  CANCELLED
+}
+
+model Proposal {
+  id          String   @id @default(uuid())
+  proposalId  Int      @unique
+  tokenId     String
+  proposer    String
+  title       String
+  description String?
+  proposalType ProposalType
+  status      ProposalStatus @default(ACTIVE)
+  startTime   DateTime
+  endTime     DateTime
+  quorum      BigInt
+  threshold   BigInt
+  metadata    String?
+  txHash      String   @unique
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  executedAt  DateTime?
+  cancelledAt DateTime?
+
+  votes       Vote[]
+  executions  ProposalExecution[]
+
+  @@index([tokenId])
+  @@index([proposer])
+  @@index([status])
+  @@index([startTime])
+  @@index([endTime])
+  @@index([createdAt])
+}
+
+model Vote {
+  id         String   @id @default(uuid())
+  proposalId String
+  voter      String
+  support    Boolean
+  weight     BigInt
+  reason     String?
+  txHash     String   @unique
+  timestamp  DateTime @default(now())
+
+  proposal Proposal @relation(fields: [proposalId], references: [id])
+
+  @@unique([proposalId, voter])
+  @@index([proposalId])
+  @@index([voter])
+  @@index([timestamp])
+}
+
+model ProposalExecution {
+  id          String   @id @default(uuid())
+  proposalId  String
+  executor    String
+  success     Boolean
+  returnData  String?
+  gasUsed     BigInt?
+  txHash      String   @unique
+  executedAt  DateTime @default(now())
+
+  proposal Proposal @relation(fields: [proposalId], references: [id])
+
+  @@index([proposalId])
+  @@index([executor])
+  @@index([executedAt])
+}
+
+enum ProposalType {
+  PARAMETER_CHANGE
+  ADMIN_TRANSFER
+  TREASURY_SPEND
+  CONTRACT_UPGRADE
+  CUSTOM
+}
+
+enum ProposalStatus {
+  ACTIVE
+  PASSED
+  REJECTED
+  EXECUTED
+  CANCELLED
+  EXPIRED
+}

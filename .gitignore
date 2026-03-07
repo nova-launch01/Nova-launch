@@ -9,6 +9,7 @@ target/
 # Build outputs
 dist/
 build/
+.next/
 *.wasm
 
 # IDE
@@ -38,6 +39,8 @@ npm-debug.log*
 !DEPLOYMENT_CHECKLIST.md
 !CONFLICT_AND_CI_REPORT.md
 !GLOBAL_ERROR_HANDLING.md
+!docs/user-guides/*.md
+!ACCESSIBILITY_TESTING_GUIDE.md
 
 # Deployment artifacts (generated during deployment)
 deployment-testnet.json

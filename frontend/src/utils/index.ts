@@ -1,4 +1,5 @@
 export * from './validation';
+export * from './burnValidation';
 export * from './formatting';
 export {
   createError,

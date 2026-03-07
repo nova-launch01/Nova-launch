@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Button } from '../UI/Button';
+import { Button, SkeletonList } from '../UI';
 import { TokenCard } from './TokenCard';
 import { NoTokensEmptyState, NoWalletEmptyState } from '../UI';
 import type { TokenInfo, WalletState } from '../../types';
@@ -39,9 +39,11 @@ export function TokenList({ wallet }: TokenListProps) {
 
   if (loading) {
     return (
-      <div className="text-center py-12">
-        <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-        <p className="mt-4 text-gray-600">Loading tokens...</p>
+      <div className="space-y-4">
+        <div className="flex justify-between items-center">
+          <h2 className="text-2xl font-bold text-gray-900">Your Tokens</h2>
+        </div>
+        <SkeletonList count={3} variant="card" />
       </div>
     );
   }
