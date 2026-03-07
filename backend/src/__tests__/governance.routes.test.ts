@@ -170,6 +170,51 @@ describe('Governance Routes', () => {
 
       expect(response.body.success).toBe(false);
     });
+
+    it('should validate limit parameter', async () => {
+      const response = await request(app)
+        .get('/api/governance/proposals/1/votes')
+        .query({ limit: 200 })
+        .expect(400);
+
+      expect(response.body.success).toBe(false);
+    });
+  });
+
+  describe('GET /api/governance/proposals/:proposalId/execution', () => {
+    beforeEach(async () => {
+      const event = mapper.mapEvent(proposalCreatedEvent);
+      await parser.parseEvent(event!);
+    });
+
+    it('should return execution status for a proposal', async () => {
+      const response = await request(app)
+        .get('/api/governance/proposals/1/execution')
+        .expect(200);
+
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.proposalId).toBe(1);
+      expect(response.body.data.status).toBeDefined();
+      expect(response.body.data.isExecuted).toBeDefined();
+      expect(response.body.data.canExecute).toBeDefined();
+    });
+
+    it('should return 404 for non-existent proposal', async () => {
+      const response = await request(app)
+        .get('/api/governance/proposals/999/execution')
+        .expect(404);
+
+      expect(response.body.success).toBe(false);
+      expect(response.body.error).toBe('Proposal not found');
+    });
+
+    it('should validate proposalId parameter', async () => {
+      const response = await request(app)
+        .get('/api/governance/proposals/invalid/execution')
+        .expect(400);
+
+      expect(response.body.success).toBe(false);
+    });
   });
 
   describe('GET /api/governance/stats', () => {

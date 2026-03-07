@@ -1,16 +1,81 @@
 import { Router, Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { GovernanceEventParser } from '../services/governanceEventParser';
+import { query, param } from 'express-validator';
+import { validate } from '../middleware/validation';
 
 const router = Router();
 const prisma = new PrismaClient();
 const governanceParser = new GovernanceEventParser(prisma);
 
 /**
- * GET /api/governance/proposals
- * Get all proposals with optional filters
+ * @openapi
+ * /api/governance/proposals:
+ *   get:
+ *     summary: List all proposals
+ *     tags: [Governance]
+ *     parameters:
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [ACTIVE, PASSED, REJECTED, EXECUTED, CANCELLED, EXPIRED]
+ *       - in: query
+ *         name: proposalType
+ *         schema:
+ *           type: string
+ *           enum: [PARAMETER_CHANGE, ADMIN_TRANSFER, TREASURY_SPEND, CONTRACT_UPGRADE, CUSTOM]
+ *       - in: query
+ *         name: tokenId
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: proposer
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           maximum: 100
+ *           default: 50
+ *       - in: query
+ *         name: offset
+ *         schema:
+ *           type: integer
+ *           minimum: 0
+ *           default: 0
+ *       - in: query
+ *         name: sortBy
+ *         schema:
+ *           type: string
+ *           enum: [createdAt, startTime, endTime]
+ *           default: createdAt
+ *       - in: query
+ *         name: sortOrder
+ *         schema:
+ *           type: string
+ *           enum: [asc, desc]
+ *           default: desc
+ *     responses:
+ *       200:
+ *         description: List of proposals
+ *       400:
+ *         description: Validation error
+ *       500:
+ *         description: Server error
  */
-router.get('/proposals', async (req: Request, res: Response) => {
+router.get(
+  '/proposals',
+  [
+    query('limit').optional().isInt({ min: 1, max: 100 }).toInt(),
+    query('offset').optional().isInt({ min: 0 }).toInt(),
+    query('sortBy').optional().isIn(['createdAt', 'startTime', 'endTime']),
+    query('sortOrder').optional().isIn(['asc', 'desc']),
+    validate,
+  ],
+  async (req: Request, res: Response) => {
   try {
     const {
       status,
@@ -102,10 +167,32 @@ router.get('/proposals', async (req: Request, res: Response) => {
 });
 
 /**
- * GET /api/governance/proposals/:proposalId
- * Get a specific proposal by ID
+ * @openapi
+ * /api/governance/proposals/{proposalId}:
+ *   get:
+ *     summary: Get proposal by ID
+ *     tags: [Governance]
+ *     parameters:
+ *       - in: path
+ *         name: proposalId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Proposal details with analytics
+ *       404:
+ *         description: Proposal not found
+ *       500:
+ *         description: Server error
  */
-router.get('/proposals/:proposalId', async (req: Request, res: Response) => {
+router.get(
+  '/proposals/:proposalId',
+  [
+    param('proposalId').isInt({ min: 0 }).toInt(),
+    validate,
+  ],
+  async (req: Request, res: Response) => {
   try {
     const { proposalId } = req.params;
 
@@ -163,10 +250,47 @@ router.get('/proposals/:proposalId', async (req: Request, res: Response) => {
 });
 
 /**
- * GET /api/governance/proposals/:proposalId/votes
- * Get all votes for a specific proposal
+ * @openapi
+ * /api/governance/proposals/{proposalId}/votes:
+ *   get:
+ *     summary: Get votes for a proposal
+ *     tags: [Governance]
+ *     parameters:
+ *       - in: path
+ *         name: proposalId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           maximum: 100
+ *           default: 100
+ *       - in: query
+ *         name: offset
+ *         schema:
+ *           type: integer
+ *           minimum: 0
+ *           default: 0
+ *     responses:
+ *       200:
+ *         description: List of votes
+ *       404:
+ *         description: Proposal not found
+ *       500:
+ *         description: Server error
  */
-router.get('/proposals/:proposalId/votes', async (req: Request, res: Response) => {
+router.get(
+  '/proposals/:proposalId/votes',
+  [
+    param('proposalId').isInt({ min: 0 }).toInt(),
+    query('limit').optional().isInt({ min: 1, max: 100 }).toInt(),
+    query('offset').optional().isInt({ min: 0 }).toInt(),
+    validate,
+  ],
+  async (req: Request, res: Response) => {
   try {
     const { proposalId } = req.params;
     const { limit = '100', offset = '0' } = req.query;
@@ -216,8 +340,88 @@ router.get('/proposals/:proposalId/votes', async (req: Request, res: Response) =
 });
 
 /**
- * GET /api/governance/stats
- * Get governance statistics
+ * @openapi
+ * /api/governance/proposals/{proposalId}/execution:
+ *   get:
+ *     summary: Get proposal execution status
+ *     tags: [Governance]
+ *     parameters:
+ *       - in: path
+ *         name: proposalId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Execution status and history
+ *       404:
+ *         description: Proposal not found
+ *       500:
+ *         description: Server error
+ */
+router.get(
+  '/proposals/:proposalId/execution',
+  [
+    param('proposalId').isInt({ min: 0 }).toInt(),
+    validate,
+  ],
+  async (req: Request, res: Response) => {
+    try {
+      const { proposalId } = req.params;
+
+      const proposal = await prisma.proposal.findUnique({
+        where: { proposalId: parseInt(proposalId) },
+        include: {
+          executions: {
+            orderBy: { executedAt: 'desc' },
+          },
+        },
+      });
+
+      if (!proposal) {
+        return res.status(404).json({
+          success: false,
+          error: 'Proposal not found',
+        });
+      }
+
+      const serializedExecutions = proposal.executions.map(e => ({
+        ...e,
+        gasUsed: e.gasUsed?.toString(),
+      }));
+
+      res.json({
+        success: true,
+        data: {
+          proposalId: proposal.proposalId,
+          status: proposal.status,
+          executedAt: proposal.executedAt,
+          executions: serializedExecutions,
+          isExecuted: proposal.status === 'EXECUTED',
+          canExecute: proposal.status === 'PASSED' && !proposal.executedAt,
+        },
+      });
+    } catch (error) {
+      console.error('Error fetching execution status:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to fetch execution status',
+      });
+    }
+  }
+);
+
+/**
+ * @openapi
+ * /api/governance/stats:
+ *   get:
+ *     summary: Get governance statistics
+ *     tags: [Governance]
+ *     responses:
+ *       200:
+ *         description: Governance statistics
+ *       500:
+ *         description: Server error
  */
 router.get('/stats', async (req: Request, res: Response) => {
   try {

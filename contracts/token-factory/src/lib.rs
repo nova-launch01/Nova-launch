@@ -46,6 +46,7 @@ mod test_helpers;
 // #[cfg(test)]
 // mod proposal_execution_test;
 
+
 use soroban_sdk::{contract, contractimpl, symbol_short, Address, Env, String, Vec, Vec as SorobanVec};
 use types::{ContractMetadata, Error, FactoryState, TokenInfo, TokenCreationParams, StreamInfo, StreamParams, TokenStats, TimelockConfig};
 
@@ -1173,7 +1174,7 @@ impl TokenFactory {
     pub fn get_tokens_by_creator(
         env: Env,
         creator: Address,
-        cursor: Option<u32>,
+        cursor: types::PaginationCursor,
         limit: Option<u32>,
     ) -> Result<types::PaginatedTokens, Error> {
         pagination::get_tokens_by_creator(&env, &creator, cursor, limit)
@@ -1736,24 +1737,20 @@ impl TokenFactory {
 // #[cfg(test)]
 // mod admin_burn_test;
 
-// Temporarily disabled - has compilation errors
-// #[cfg(test)]
-// mod admin_transfer_test;
-
-// Temporarily disabled - has compilation errors
-// #[cfg(test)]
-// mod fee_collection_test;
+#[cfg(test)]
+#[cfg(test)]
+mod admin_transfer_test;
 
 // Temporarily disabled - has compilation errors
 // mod event_tests;
 
-// Temporarily disabled - has compilation errors
-// #[cfg(test)]
-// mod error_handling_test;
+#[cfg(test)]
+#[cfg(test)]
+mod error_handling_test;
 
-// Temporarily disabled - has compilation errors
-// #[cfg(test)]
-// mod metadata_test;
+#[cfg(test)]
+#[cfg(test)]
+mod metadata_test;
 
 // Temporarily disabled due to compilation issues
 // #[cfg(test)]
@@ -1778,28 +1775,32 @@ impl TokenFactory {
 // #[cfg(test)]
 // mod state_events_test;
 
+#[cfg(test)]
+#[cfg(test)]
+mod state_events_test;
+
+#[cfg(test)]
+#[cfg(test)]
+mod fuzz_string_boundaries;
 // Temporarily disabled - has compilation errors
 // #[cfg(test)]
-// mod fuzz_string_boundaries;
+// #[cfg(test)]
+mod fuzz_string_boundaries;
 
 // Temporarily disabled - has compilation errors
 // #[cfg(test)]
 // mod fuzz_numeric_boundaries;
 
-// Temporarily disabled - has compilation errors
-// #[cfg(test)]
-// mod upgrade_test;
+#[cfg(test)]
+#[cfg(test)]
+mod upgrade_test;
 
-// Temporarily disabled - has compilation errors
-// #[cfg(test)]
-// mod fuzz_test;
+#[cfg(test)]
+#[cfg(test)]
+mod fuzz_test;
 
-// #[cfg(test)]
-// mod token_pause_test;
-
-// #[cfg(test)]
-// mod token_stats_test;
-
+#[cfg(test)]
+#[cfg(test)]
 mod integration_test;
 
 mod gas_benchmark_comprehensive;
@@ -1828,16 +1829,16 @@ mod gas_benchmark_comprehensive;
 mod timelock_proposal_test;
 
 #[cfg(test)]
-mod timelock_voting_test;
+#[cfg(test)]
+mod timelock_test;
 
 #[cfg(test)]
-mod queue_proposal_test;
+#[cfg(test)]
+mod pagination_integration_test;
 
 #[cfg(test)]
-mod proposal_execution_test;
+#[cfg(test)]
+mod treasury_integration_test;
 
 #[cfg(test)]
-mod batch_claim_test;
-
-#[cfg(test)]
-mod governance_error_test;
+mod token_count_test;

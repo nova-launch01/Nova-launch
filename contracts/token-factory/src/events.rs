@@ -312,7 +312,7 @@ pub fn emit_timelock_configured(env: &Env, delay_seconds: u64) {
 pub fn emit_change_scheduled(env: &Env, change_id: u64, change_type: crate::types::ChangeType, execute_at: u64) {
     env.events().publish(
         (symbol_short!("ch_sched"), change_id),
-        (change_type, execute_at),
+        (change_type.clone(), execute_at),
     );
 }
 
@@ -322,7 +322,7 @@ pub fn emit_change_scheduled(env: &Env, change_id: u64, change_type: crate::type
 pub fn emit_change_executed(env: &Env, change_id: u64, change_type: crate::types::ChangeType) {
     env.events().publish(
         (symbol_short!("ch_exec"), change_id),
-        (change_type,),
+        (change_type.clone(),),
     );
 }
 
@@ -332,7 +332,7 @@ pub fn emit_change_executed(env: &Env, change_id: u64, change_type: crate::types
 pub fn emit_change_cancelled(env: &Env, change_id: u64, change_type: crate::types::ChangeType) {
     env.events().publish(
         (symbol_short!("ch_cncl"), change_id),
-        (change_type,),
+        (change_type.clone(),),
     );
 }
 
