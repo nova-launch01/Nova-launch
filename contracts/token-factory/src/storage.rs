@@ -69,10 +69,10 @@ pub fn get_token_info(env: &Env, index: u32) -> Option<TokenInfo> {
 
 pub fn set_token_info(env: &Env, index: u32, info: &TokenInfo) {
     env.storage().instance().set(&DataKey::Token(index), info);
-    
+
     // Index by creator for pagination
     add_creator_token(env, &info.creator, index);
-    
+
     // Emit token registered event
     crate::events::emit_token_registered(env, &info.address, &info.creator);
 }
@@ -577,9 +577,10 @@ pub fn get_balance(env: &Env, token_index: u32, holder: &Address) -> i128 {
 }
 
 pub fn set_balance(env: &Env, token_index: u32, holder: &Address, balance: i128) {
-    env.storage()
-        .persistent()
-        .set(&crate::types::DataKey::Balance(token_index, holder.clone()), &balance);
+    env.storage().persistent().set(
+        &crate::types::DataKey::Balance(token_index, holder.clone()),
+        &balance,
+    );
 }
 
 pub fn get_burn_count(env: &Env, token_index: u32) -> u32 {
@@ -676,11 +677,7 @@ pub fn update_token_supply(env: &Env, token_address: &Address, amount_change: i1
 // Phase 2 Optimization: Batch admin state operations
 // Allows multiple admin parameters to be updated efficiently in a single transaction
 // Reduces gas by combining storage verification and writes
-pub fn batch_update_fees(
-    env: &Env,
-    base_fee: Option<i128>,
-    metadata_fee: Option<i128>,
-) {
+pub fn batch_update_fees(env: &Env, base_fee: Option<i128>, metadata_fee: Option<i128>) {
     if let Some(fee) = base_fee {
         set_base_fee(env, fee);
     }
@@ -698,7 +695,6 @@ pub fn get_admin_state(env: &Env) -> (Address, bool) {
     (admin, paused)
 }
 
-
 // ── Timelock storage functions ─────────────────────────────
 
 pub fn get_timelock_config(env: &Env) -> crate::types::TimelockConfig {
@@ -712,18 +708,21 @@ pub fn get_timelock_config(env: &Env) -> crate::types::TimelockConfig {
 }
 
 pub fn set_timelock_config(env: &Env, config: &crate::types::TimelockConfig) {
-    env.storage().instance().set(&DataKey::TimelockConfig, config);
+    env.storage()
+        .instance()
+        .set(&DataKey::TimelockConfig, config);
 }
 
 pub fn get_next_change_id(env: &Env) -> Result<u64, Error> {
-    let id = env.storage()
+    let id = env
+        .storage()
         .instance()
         .get(&DataKey::NextChangeId)
         .unwrap_or(0_u64);
-    let next_id = id
-        .checked_add(1)
-        .ok_or(Error::ArithmeticError)?;
-    env.storage().instance().set(&DataKey::NextChangeId, &next_id);
+    let next_id = id.checked_add(1).ok_or(Error::ArithmeticError)?;
+    env.storage()
+        .instance()
+        .set(&DataKey::NextChangeId, &next_id);
     Ok(id)
 }
 
@@ -745,7 +744,6 @@ pub fn remove_pending_change(env: &Env, change_id: u64) {
         .remove(&DataKey::PendingChange(change_id));
 }
 
-
 // ── Creator indexing functions ─────────────────────────────
 
 /// Add a token index to a creator's token list
@@ -755,13 +753,13 @@ pub fn add_creator_token(env: &Env, creator: &Address, token_index: u32) {
         .persistent()
         .get(&DataKey::CreatorTokens(creator.clone()))
         .unwrap_or(soroban_sdk::Vec::new(env));
-    
+
     tokens.push_back(token_index);
-    
+
     env.storage()
         .persistent()
         .set(&DataKey::CreatorTokens(creator.clone()), &tokens);
-    
+
     // Update count
     let count = tokens.len();
     env.storage()
@@ -800,15 +798,14 @@ pub fn get_beneficiary_stream_entry(env: &Env, beneficiary: &Address, index: u32
     }
 }
 
-
 // ── Token-stream indexing functions ─────────────────────────────
 
 /// Add a stream ID to a token's stream list
-/// 
+///
 /// Appends the stream_id to the token's stream vector and updates
 /// the TokenStreamCount atomically. If the token has no existing
 /// streams, initializes an empty vector first.
-/// 
+///
 /// # Arguments
 /// * `env` - The contract environment
 /// * `token_index` - Index of the token
@@ -820,13 +817,11 @@ pub fn add_token_stream(env: &Env, token_index: u32, stream_id: u32) {
         .instance()
         .get(&key)
         .unwrap_or(soroban_sdk::Vec::new(env));
-    
+
     streams.push_back(stream_id);
-    
-    env.storage()
-        .instance()
-        .set(&key, &streams);
-    
+
+    env.storage().instance().set(&key, &streams);
+
     // Update count atomically
     let count = streams.len();
     env.storage()
@@ -835,14 +830,14 @@ pub fn add_token_stream(env: &Env, token_index: u32, stream_id: u32) {
 }
 
 /// Get all stream IDs for a token
-/// 
+///
 /// Retrieves the vector of stream IDs associated with the specified token.
 /// Returns an empty vector if the token has no streams.
-/// 
+///
 /// # Arguments
 /// * `env` - The contract environment
 /// * `token_index` - Index of the token
-/// 
+///
 /// # Returns
 /// Vector of stream IDs for this token (empty if none exist)
 pub fn get_token_streams(env: &Env, token_index: u32) -> soroban_sdk::Vec<u32> {
@@ -853,14 +848,14 @@ pub fn get_token_streams(env: &Env, token_index: u32) -> soroban_sdk::Vec<u32> {
 }
 
 /// Get the count of streams for a token
-/// 
+///
 /// Retrieves the stream count without loading the full stream data.
 /// Returns 0 if the token has no streams.
-/// 
+///
 /// # Arguments
 /// * `env` - The contract environment
 /// * `token_index` - Index of the token
-/// 
+///
 /// # Returns
 /// Number of streams for this token
 pub fn get_token_stream_count(env: &Env, token_index: u32) -> u32 {
@@ -869,7 +864,6 @@ pub fn get_token_stream_count(env: &Env, token_index: u32) -> u32 {
         .get(&DataKey::TokenStreamCount(token_index))
         .unwrap_or(0)
 }
-
 
 // ── Treasury storage functions ─────────────────────────────
 
@@ -960,11 +954,14 @@ pub fn set_stream(env: &Env, stream_id: u64, stream: &crate::types::StreamInfo) 
 
 /// Get next stream ID
 pub fn get_next_stream_id(env: &Env) -> u64 {
-    let id = env.storage()
+    let id = env
+        .storage()
         .instance()
         .get(&DataKey::NextStreamId)
         .unwrap_or(0_u64);
-    env.storage().instance().set(&DataKey::NextStreamId, &(id + 1));
+    env.storage()
+        .instance()
+        .set(&DataKey::NextStreamId, &(id + 1));
     id
 }
 
@@ -990,11 +987,14 @@ pub fn increment_proposal_count(env: &Env) -> u32 {
 
 /// Get next proposal ID
 pub fn get_next_proposal_id(env: &Env) -> u64 {
-    let id = env.storage()
+    let id = env
+        .storage()
         .instance()
         .get(&DataKey::NextProposalId)
         .unwrap_or(0_u64);
-    env.storage().instance().set(&DataKey::NextProposalId, &(id + 1));
+    env.storage()
+        .instance()
+        .set(&DataKey::NextProposalId, &(id + 1));
     id
 }
 
@@ -1011,7 +1011,6 @@ pub fn set_proposal(env: &Env, proposal_id: u64, proposal: &crate::types::Propos
         .persistent()
         .set(&DataKey::Proposal(proposal_id), proposal);
 }
-
 
 /// Check if an address has voted on a proposal
 pub fn has_voted(env: &Env, proposal_id: u64, voter: &Address) -> bool {
@@ -1033,7 +1032,6 @@ pub fn get_vote(env: &Env, proposal_id: u64, voter: &Address) -> Option<crate::t
         .persistent()
         .get(&DataKey::ProposalVote(proposal_id, voter.clone()))
 }
-
 
 // ============================================================
 // Storage Functions - Address Freezing

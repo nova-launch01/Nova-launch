@@ -3,25 +3,27 @@
 mod freeze_functions;
 mod governance;
 
-mod events;
-mod event_versions;
-mod storage;
 mod burn;
-mod types;
-mod validation;
-mod timelock;
-mod pagination;
-mod mint;
-mod treasury;
-mod stream_types;
 mod differential_engine;
+mod event_versions;
+mod events;
+mod mint;
+mod pagination;
 mod proposal_state_machine;
+mod storage;
+mod stream_types;
 #[cfg(test)]
 mod test_helpers;
+mod timelock;
+mod treasury;
+mod types;
+mod validation;
 // #[cfg(test)]
 // mod governance_events_versioning_test;
 #[cfg(test)]
 mod adversarial_timing_test;
+#[cfg(test)]
+mod governance_timelock_boundary_test;
 mod streaming;
 // #[cfg(test)]
 // mod creator_streams_test;
@@ -56,7 +58,10 @@ mod streaming;
 // mod governance_test;
 
 use soroban_sdk::{contract, contractimpl, symbol_short, Address, Env, String, Vec};
-use types::{ContractMetadata, Error, FactoryState, TokenInfo, TokenStats, StreamInfo, StreamParams, PaginationCursor, StreamPage};
+use types::{
+    ContractMetadata, Error, FactoryState, PaginationCursor, StreamInfo, StreamPage, StreamParams,
+    TokenInfo, TokenStats,
+};
 
 #[contract]
 pub struct TokenFactory;
@@ -169,7 +174,9 @@ impl TokenFactory {
         let base_fee = storage::get_base_fee(&env);
         let metadata_fee = storage::get_metadata_fee(&env);
         let required_fee = if metadata_uri.is_some() {
-            base_fee.checked_add(metadata_fee).ok_or(Error::ArithmeticError)?
+            base_fee
+                .checked_add(metadata_fee)
+                .ok_or(Error::ArithmeticError)?
         } else {
             base_fee
         };
@@ -200,8 +207,6 @@ impl TokenFactory {
             freeze_enabled: false,
             clawback_enabled: false,
             is_paused: false, // Default to not paused
-        
-        
         };
 
         storage::set_token_info(&env, token_count, &token_info);
@@ -547,7 +552,7 @@ impl TokenFactory {
         // Get updated fees for event
         let new_base_fee = base_fee.unwrap_or_else(|| storage::get_base_fee(&env));
         let new_metadata_fee = metadata_fee.unwrap_or_else(|| storage::get_metadata_fee(&env));
-        
+
         // Emit optimized event
         events::emit_fees_updated(&env, new_base_fee, new_metadata_fee);
 
@@ -642,14 +647,12 @@ impl TokenFactory {
         // Get final state for event
         let final_base_fee = storage::get_base_fee(&env);
         let final_metadata_fee = storage::get_metadata_fee(&env);
-        
+
         // Emit single consolidated event (Phase 2 optimization)
         events::emit_fees_updated(&env, final_base_fee, final_metadata_fee);
 
         Ok(())
     }
-
-
 
     /// Get token information by contract address
     ///
@@ -800,7 +803,12 @@ impl TokenFactory {
     /// ];
     /// factory.batch_burn(&env, admin, 0, burns)?;
     /// ```
-    pub fn batch_burn(env: Env, admin: Address, token_index: u32, burns: soroban_sdk::Vec<(Address, i128)>) -> Result<(), Error> {
+    pub fn batch_burn(
+        env: Env,
+        admin: Address,
+        token_index: u32,
+        burns: soroban_sdk::Vec<(Address, i128)>,
+    ) -> Result<(), Error> {
         burn::batch_burn(&env, admin, token_index, burns)
     }
 
@@ -914,8 +922,8 @@ impl TokenFactory {
         admin.require_auth();
 
         // Get token info
-        let mut token_info = storage::get_token_info(&env, token_index)
-            .ok_or(Error::TokenNotFound)?;
+        let mut token_info =
+            storage::get_token_info(&env, token_index).ok_or(Error::TokenNotFound)?;
 
         // Verify admin is the token creator
         if token_info.creator != admin {
@@ -972,9 +980,9 @@ impl TokenFactory {
             current_supply: storage::get_token_info(&env, token_index)
                 .map(|i| i.total_supply)
                 .unwrap_or(0),
-            total_burned:   storage::get_total_burned(&env, token_index),
-            burn_count:     storage::get_burn_count(&env, token_index),
-            is_paused:      storage::is_token_paused(&env, token_index),
+            total_burned: storage::get_total_burned(&env, token_index),
+            burn_count: storage::get_burn_count(&env, token_index),
+            is_paused: storage::is_token_paused(&env, token_index),
             clawback_enabled: false,
             freeze_enabled: false,
         })
@@ -996,7 +1004,8 @@ impl TokenFactory {
         let mut i = cursor;
 
         while i < total && (i - cursor) < limit {
-            if let Some(token_index) = storage::get_beneficiary_stream_entry(&env, &beneficiary, i) {
+            if let Some(token_index) = storage::get_beneficiary_stream_entry(&env, &beneficiary, i)
+            {
                 token_indices.push_back(token_index);
             }
             i += 1;
@@ -1068,11 +1077,7 @@ impl TokenFactory {
     /// ```
     /// let change_id = factory.schedule_pause_update(&env, admin, true)?;
     /// ```
-    pub fn schedule_pause_update(
-        env: Env,
-        admin: Address,
-        paused: bool,
-    ) -> Result<u64, Error> {
+    pub fn schedule_pause_update(env: Env, admin: Address, paused: bool) -> Result<u64, Error> {
         timelock::schedule_pause_update(&env, &admin, paused)
     }
 
@@ -1228,12 +1233,12 @@ impl TokenFactory {
     /// ```
     /// // First page
     /// let page1 = factory.get_tokens_by_creator(&env, creator, None, Some(20))?;
-    /// 
+    ///
     /// // Next page
     /// if let Some(cursor) = page1.cursor {
     ///     let page2 = factory.get_tokens_by_creator(&env, creator, Some(cursor), Some(20))?;
     /// }
-    /// 
+    ///
     /// // Get total count
     /// let total = factory.get_creator_token_count(&env, creator);
     /// ```
@@ -1243,8 +1248,11 @@ impl TokenFactory {
         cursor: Option<u32>,
         limit: Option<u32>,
     ) -> Result<types::PaginatedTokens, Error> {
-        let pagination_cursor = cursor.map(|next_index| PaginationCursor { next_index })
-            .unwrap_or(PaginationCursor { next_index: u32::MAX }); // Using MAX as NO_CURSOR equivalent
+        let pagination_cursor = cursor
+            .map(|next_index| PaginationCursor { next_index })
+            .unwrap_or(PaginationCursor {
+                next_index: u32::MAX,
+            }); // Using MAX as NO_CURSOR equivalent
         pagination::get_tokens_by_creator(&env, &creator, pagination_cursor, limit)
     }
 
@@ -1318,17 +1326,16 @@ impl TokenFactory {
         if storage::is_paused(&env) {
             return Err(Error::ContractPaused);
         }
-        
+
         creator.require_auth();
-        
+
         // Verify creator owns the token
-        let token_info = storage::get_token_info(&env, token_index)
-            .ok_or(Error::TokenNotFound)?;
-        
+        let token_info = storage::get_token_info(&env, token_index).ok_or(Error::TokenNotFound)?;
+
         if token_info.creator != creator {
             return Err(Error::Unauthorized);
         }
-        
+
         // Perform mint with max supply validation
         mint::mint(&env, token_index, &to, amount)
     }
@@ -1393,12 +1400,12 @@ impl TokenFactory {
         allowlist_enabled: bool,
     ) -> Result<(), Error> {
         admin.require_auth();
-        
+
         let current_admin = storage::get_admin(&env);
         if admin != current_admin {
             return Err(Error::Unauthorized);
         }
-        
+
         treasury::initialize_treasury_policy(&env, daily_cap, allowlist_enabled)
     }
 
@@ -1668,8 +1675,7 @@ impl TokenFactory {
         }
 
         // Get the stream
-        let mut stream = storage::get_stream(&env, stream_id.into())
-            .ok_or(Error::TokenNotFound)?;
+        let mut stream = storage::get_stream(&env, stream_id.into()).ok_or(Error::TokenNotFound)?;
 
         // Verify authorization: only creator or admin can update
         let admin = storage::get_admin(&env);
@@ -1766,7 +1772,6 @@ impl TokenFactory {
     ) -> bool {
         governance::is_approval_met(yes_votes, total_votes, approval_percent)
     }
-
 }
 
 // Temporarily disabled - requires create_token implementation

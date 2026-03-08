@@ -29,12 +29,17 @@ impl TestEnv {
         storage::set_base_fee(&env, 1_000_000);
         storage::set_metadata_fee(&env, 500_000);
 
-        Self { env, admin, treasury }
+        Self {
+            env,
+            admin,
+            treasury,
+        }
     }
 
     pub fn with_timelock(delay_seconds: u64) -> Self {
         let test_env = Self::new();
         timelock::initialize_timelock(&test_env.env, Some(delay_seconds)).unwrap();
+        crate::governance::initialize_governance(&test_env.env, Some(30), Some(51)).unwrap();
         test_env
     }
 }
@@ -229,7 +234,11 @@ impl<'a> EventAssertions<'a> {
     }
 
     pub fn assert_count(&self, name: &str, expected: u32) {
-        assert_eq!(self.count(name), expected as usize, "event count mismatch for {name}");
+        assert_eq!(
+            self.count(name),
+            expected as usize,
+            "event count mismatch for {name}"
+        );
     }
 
     pub fn assert_chronological(&self, _expected: &[&str]) {

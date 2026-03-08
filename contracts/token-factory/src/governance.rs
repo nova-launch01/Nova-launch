@@ -1,7 +1,7 @@
-use soroban_sdk::{Address, Env};
-use crate::types::{Error, GovernanceConfig};
-use crate::storage;
 use crate::events;
+use crate::storage;
+use crate::types::{Error, GovernanceConfig};
+use soroban_sdk::{Address, Env};
 
 /// Default quorum percentage (30%)
 const DEFAULT_QUORUM_PERCENT: u32 = 30;
@@ -27,17 +27,17 @@ pub fn initialize_governance(
 ) -> Result<(), Error> {
     let quorum = quorum_percent.unwrap_or(DEFAULT_QUORUM_PERCENT);
     let approval = approval_percent.unwrap_or(DEFAULT_APPROVAL_PERCENT);
-    
+
     validate_percentages(quorum, approval)?;
-    
+
     let config = GovernanceConfig {
         quorum_percent: quorum,
         approval_percent: approval,
     };
-    
+
     storage::set_governance_config(env, &config);
     events::emit_governance_configured(env, quorum, approval);
-    
+
     Ok(())
 }
 
@@ -61,31 +61,31 @@ pub fn update_governance_config(
     approval_percent: Option<u32>,
 ) -> Result<(), Error> {
     admin.require_auth();
-    
+
     let current_admin = storage::get_admin(env);
     if *admin != current_admin {
         return Err(Error::Unauthorized);
     }
-    
+
     if quorum_percent.is_none() && approval_percent.is_none() {
         return Err(Error::InvalidParameters);
     }
-    
+
     let mut config = storage::get_governance_config(env);
-    
+
     if let Some(quorum) = quorum_percent {
         config.quorum_percent = quorum;
     }
-    
+
     if let Some(approval) = approval_percent {
         config.approval_percent = approval;
     }
-    
+
     validate_percentages(config.quorum_percent, config.approval_percent)?;
-    
+
     storage::set_governance_config(env, &config);
     events::emit_governance_updated(env, config.quorum_percent, config.approval_percent);
-    
+
     Ok(())
 }
 
@@ -113,7 +113,7 @@ pub fn is_quorum_met(total_votes: u32, total_eligible: u32, quorum_percent: u32)
     if total_eligible == 0 {
         return false;
     }
-    
+
     let votes_required = (total_eligible as u64 * quorum_percent as u64) / 100;
     total_votes as u64 >= votes_required
 }
@@ -131,7 +131,7 @@ pub fn is_approval_met(yes_votes: u32, total_votes: u32, approval_percent: u32) 
     if total_votes == 0 {
         return false;
     }
-    
+
     let yes_required = (total_votes as u64 * approval_percent as u64) / 100;
     yes_votes as u64 >= yes_required
 }
@@ -148,7 +148,7 @@ fn validate_percentages(quorum_percent: u32, approval_percent: u32) -> Result<()
     if quorum_percent > 100 || approval_percent > 100 {
         return Err(Error::InvalidParameters);
     }
-    
+
     Ok(())
 }
 
@@ -156,206 +156,206 @@ fn validate_percentages(quorum_percent: u32, approval_percent: u32) -> Result<()
 mod tests {
     use super::*;
     use soroban_sdk::{testutils::Address as _, Env};
-    
+
     fn setup() -> (Env, Address) {
         let env = Env::default();
         env.mock_all_auths();
-        
+
         let admin = Address::generate(&env);
         storage::set_admin(&env, &admin);
-        
+
         (env, admin)
     }
-    
+
     #[test]
     fn test_initialize_governance_defaults() {
         let (env, _) = setup();
-        
+
         initialize_governance(&env, None, None).unwrap();
-        
+
         let config = get_governance_config(&env);
         assert_eq!(config.quorum_percent, 30);
         assert_eq!(config.approval_percent, 51);
     }
-    
+
     #[test]
     fn test_initialize_governance_custom() {
         let (env, _) = setup();
-        
+
         initialize_governance(&env, Some(40), Some(60)).unwrap();
-        
+
         let config = get_governance_config(&env);
         assert_eq!(config.quorum_percent, 40);
         assert_eq!(config.approval_percent, 60);
     }
-    
+
     #[test]
     fn test_initialize_governance_zero_percent() {
         let (env, _) = setup();
-        
+
         initialize_governance(&env, Some(0), Some(0)).unwrap();
-        
+
         let config = get_governance_config(&env);
         assert_eq!(config.quorum_percent, 0);
         assert_eq!(config.approval_percent, 0);
     }
-    
+
     #[test]
     fn test_initialize_governance_hundred_percent() {
         let (env, _) = setup();
-        
+
         initialize_governance(&env, Some(100), Some(100)).unwrap();
-        
+
         let config = get_governance_config(&env);
         assert_eq!(config.quorum_percent, 100);
         assert_eq!(config.approval_percent, 100);
     }
-    
+
     #[test]
     fn test_initialize_governance_invalid_quorum() {
         let (env, _) = setup();
-        
+
         let result = initialize_governance(&env, Some(101), Some(50));
         assert_eq!(result, Err(Error::InvalidParameters));
     }
-    
+
     #[test]
     fn test_initialize_governance_invalid_approval() {
         let (env, _) = setup();
-        
+
         let result = initialize_governance(&env, Some(50), Some(101));
         assert_eq!(result, Err(Error::InvalidParameters));
     }
-    
+
     #[test]
     fn test_update_governance_config() {
         let (env, admin) = setup();
-        
+
         initialize_governance(&env, Some(30), Some(51)).unwrap();
-        
+
         update_governance_config(&env, &admin, Some(50), Some(75)).unwrap();
-        
+
         let config = get_governance_config(&env);
         assert_eq!(config.quorum_percent, 50);
         assert_eq!(config.approval_percent, 75);
     }
-    
+
     #[test]
     fn test_update_governance_partial() {
         let (env, admin) = setup();
-        
+
         initialize_governance(&env, Some(30), Some(51)).unwrap();
-        
+
         update_governance_config(&env, &admin, Some(40), None).unwrap();
-        
+
         let config = get_governance_config(&env);
         assert_eq!(config.quorum_percent, 40);
         assert_eq!(config.approval_percent, 51);
     }
-    
+
     #[test]
     fn test_update_governance_unauthorized() {
         let (env, admin) = setup();
-        
+
         initialize_governance(&env, Some(30), Some(51)).unwrap();
-        
+
         let non_admin = Address::generate(&env);
         let result = update_governance_config(&env, &non_admin, Some(50), None);
         assert_eq!(result, Err(Error::Unauthorized));
     }
-    
+
     #[test]
     fn test_update_governance_both_none() {
         let (env, admin) = setup();
-        
+
         initialize_governance(&env, Some(30), Some(51)).unwrap();
-        
+
         let result = update_governance_config(&env, &admin, None, None);
         assert_eq!(result, Err(Error::InvalidParameters));
     }
-    
+
     #[test]
     fn test_is_quorum_met_exact() {
         assert!(is_quorum_met(30, 100, 30));
     }
-    
+
     #[test]
     fn test_is_quorum_met_above() {
         assert!(is_quorum_met(31, 100, 30));
     }
-    
+
     #[test]
     fn test_is_quorum_met_below() {
         assert!(!is_quorum_met(29, 100, 30));
     }
-    
+
     #[test]
     fn test_is_quorum_met_zero_eligible() {
         assert!(!is_quorum_met(10, 0, 30));
     }
-    
+
     #[test]
     fn test_is_quorum_met_zero_percent() {
         assert!(is_quorum_met(0, 100, 0));
     }
-    
+
     #[test]
     fn test_is_quorum_met_hundred_percent() {
         assert!(is_quorum_met(100, 100, 100));
         assert!(!is_quorum_met(99, 100, 100));
     }
-    
+
     #[test]
     fn test_is_quorum_met_fifty_percent() {
         assert!(is_quorum_met(50, 100, 50));
         assert!(is_quorum_met(51, 100, 50));
         assert!(!is_quorum_met(49, 100, 50));
     }
-    
+
     #[test]
     fn test_is_approval_met_exact() {
         assert!(is_approval_met(51, 100, 51));
     }
-    
+
     #[test]
     fn test_is_approval_met_above() {
         assert!(is_approval_met(52, 100, 51));
     }
-    
+
     #[test]
     fn test_is_approval_met_below() {
         assert!(!is_approval_met(50, 100, 51));
     }
-    
+
     #[test]
     fn test_is_approval_met_zero_votes() {
         assert!(!is_approval_met(10, 0, 51));
     }
-    
+
     #[test]
     fn test_is_approval_met_zero_percent() {
         assert!(is_approval_met(0, 100, 0));
     }
-    
+
     #[test]
     fn test_is_approval_met_hundred_percent() {
         assert!(is_approval_met(100, 100, 100));
         assert!(!is_approval_met(99, 100, 100));
     }
-    
+
     #[test]
     fn test_is_approval_met_fifty_percent() {
         assert!(is_approval_met(50, 100, 50));
         assert!(is_approval_met(51, 100, 50));
         assert!(!is_approval_met(49, 100, 50));
     }
-    
+
     #[test]
     fn test_rounding_behavior() {
         // 33% of 100 = 33 votes required
         assert!(is_quorum_met(33, 100, 33));
         assert!(!is_quorum_met(32, 100, 33));
-        
+
         // 33% of 99 = 32.67 -> 32 votes required (floor)
         assert!(is_quorum_met(32, 99, 33));
         assert!(!is_quorum_met(31, 99, 33));

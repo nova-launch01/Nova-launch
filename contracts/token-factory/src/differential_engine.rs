@@ -119,7 +119,8 @@ impl SupplyTracker {
         self.total_supply = self.total_supply.checked_add(amount).ok_or("Overflow")?;
         self.total_minted = self.total_minted.checked_add(amount).ok_or("Overflow")?;
         let current_bal = self.balances.get(to.clone()).unwrap_or(0);
-        self.balances.set(to, current_bal.checked_add(amount).ok_or("Overflow")?);
+        self.balances
+            .set(to, current_bal.checked_add(amount).ok_or("Overflow")?);
         Ok(())
     }
 
@@ -128,17 +129,18 @@ impl SupplyTracker {
         if balance < amount {
             return Err("Insufficient");
         }
-        self.balances.set(
-            from,
-            balance.checked_sub(amount).ok_or("Underflow")?,
-        );
+        self.balances
+            .set(from, balance.checked_sub(amount).ok_or("Underflow")?);
         self.total_supply = self.total_supply.checked_sub(amount).ok_or("Underflow")?;
         self.total_burned = self.total_burned.checked_add(amount).ok_or("Overflow")?;
         Ok(())
     }
 
     pub fn verify(&self) -> Result<(), &'static str> {
-        let calc = self.total_minted.checked_sub(self.total_burned).ok_or("Underflow")?;
+        let calc = self
+            .total_minted
+            .checked_sub(self.total_burned)
+            .ok_or("Underflow")?;
         if calc != self.total_supply {
             return Err("Supply mismatch");
         }

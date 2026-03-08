@@ -13,20 +13,23 @@ pub fn get_tokens_by_creator(
     cursor: PaginationCursor,
     limit: Option<u32>,
 ) -> Result<PaginatedTokens, Error> {
-    let page_size = limit
-        .unwrap_or(DEFAULT_PAGE_SIZE)
-        .min(MAX_PAGE_SIZE)
-        .max(1);
+    let page_size = limit.unwrap_or(DEFAULT_PAGE_SIZE).min(MAX_PAGE_SIZE).max(1);
 
     let creator_tokens = storage::get_creator_tokens(env, creator);
 
-    let start_pos = if cursor.next_index == NO_CURSOR { 0 } else { cursor.next_index };
+    let start_pos = if cursor.next_index == NO_CURSOR {
+        0
+    } else {
+        cursor.next_index
+    };
 
     if start_pos >= creator_tokens.len() {
         return Ok(PaginatedTokens {
             tokens: Vec::new(env),
             has_more: false,
-            cursor: PaginationCursor { next_index: NO_CURSOR },
+            cursor: PaginationCursor {
+                next_index: NO_CURSOR,
+            },
         });
     }
 
@@ -44,12 +47,26 @@ pub fn get_tokens_by_creator(
     }
 
     let (has_more, next_cursor) = if current_pos < creator_tokens.len() {
-        (true, PaginationCursor { next_index: current_pos })
+        (
+            true,
+            PaginationCursor {
+                next_index: current_pos,
+            },
+        )
     } else {
-        (false, PaginationCursor { next_index: NO_CURSOR })
+        (
+            false,
+            PaginationCursor {
+                next_index: NO_CURSOR,
+            },
+        )
     };
 
-    Ok(PaginatedTokens { tokens, has_more, cursor: next_cursor })
+    Ok(PaginatedTokens {
+        tokens,
+        has_more,
+        cursor: next_cursor,
+    })
 }
 
 pub fn get_creator_token_count(env: &Env, creator: &Address) -> u32 {
@@ -81,16 +98,18 @@ mod tests {
                 clawback_enabled: false,
                 is_paused: false,
                 freeze_enabled: false,
-            
-        
-        };
+            };
             storage::set_token_info(&env, i, &token_info);
             storage::add_creator_token(&env, &creator, i);
         }
         (env, creator)
     }
 
-    fn no_cursor() -> PaginationCursor { PaginationCursor { next_index: NO_CURSOR } }
+    fn no_cursor() -> PaginationCursor {
+        PaginationCursor {
+            next_index: NO_CURSOR,
+        }
+    }
 
     #[test]
     fn test_get_tokens_first_page() {
@@ -171,7 +190,10 @@ mod tests {
         let result2 = get_tokens_by_creator(&env, &creator, no_cursor(), Some(10)).unwrap();
         assert_eq!(result1.tokens.len(), result2.tokens.len());
         for i in 0..result1.tokens.len() {
-            assert_eq!(result1.tokens.get(i).unwrap().address, result2.tokens.get(i).unwrap().address);
+            assert_eq!(
+                result1.tokens.get(i).unwrap().address,
+                result2.tokens.get(i).unwrap().address
+            );
         }
     }
 
@@ -221,9 +243,7 @@ mod tests {
                 clawback_enabled: false,
                 is_paused: false,
                 freeze_enabled: false,
-            
-        
-        };
+            };
             storage::set_token_info(&env, i, &token_info);
             storage::add_creator_token(&env, &creator1, i);
         }
@@ -244,9 +264,7 @@ mod tests {
                 clawback_enabled: false,
                 is_paused: false,
                 freeze_enabled: false,
-            
-        
-        };
+            };
             storage::set_token_info(&env, i, &token_info);
             storage::add_creator_token(&env, &creator2, i);
         }

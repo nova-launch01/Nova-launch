@@ -1,9 +1,11 @@
-use soroban_sdk::{Address, Bytes, Env, Vec};
+use crate::events;
+use crate::storage;
+use crate::types::{
+    ActionType, ChangeType, Error, PendingChange, Proposal, TimelockConfig, VoteChoice,
+};
 #[cfg(test)]
 use soroban_sdk::testutils::Ledger;
-use crate::types::{Error, TimelockConfig, PendingChange, ChangeType, Proposal, ActionType, VoteChoice};
-use crate::storage;
-use crate::events;
+use soroban_sdk::{Address, Bytes, Env, Vec};
 
 /// Default timelock delay in seconds (48 hours)
 const DEFAULT_TIMELOCK_DELAY: u64 = 172_800;
@@ -24,19 +26,19 @@ const MAX_TIMELOCK_DELAY: u64 = 2_592_000;
 /// * `Error::InvalidParameters` - Delay exceeds maximum allowed
 pub fn initialize_timelock(env: &Env, delay_seconds: Option<u64>) -> Result<(), Error> {
     let delay = delay_seconds.unwrap_or(DEFAULT_TIMELOCK_DELAY);
-    
+
     if delay > MAX_TIMELOCK_DELAY {
         return Err(Error::InvalidParameters);
     }
-    
+
     let config = TimelockConfig {
         delay_seconds: delay,
         enabled: true,
     };
-    
+
     storage::set_timelock_config(env, &config);
     events::emit_timelock_configured(env, delay);
-    
+
     Ok(())
 }
 
@@ -64,37 +66,37 @@ pub fn schedule_fee_update(
     metadata_fee: Option<i128>,
 ) -> Result<u64, Error> {
     admin.require_auth();
-    
+
     let current_admin = storage::get_admin(env);
     if *admin != current_admin {
         return Err(Error::Unauthorized);
     }
-    
+
     if base_fee.is_none() && metadata_fee.is_none() {
         return Err(Error::InvalidParameters);
     }
-    
+
     // Validate fees
     if let Some(fee) = base_fee {
         if fee < 0 {
             return Err(Error::InvalidParameters);
         }
     }
-    
+
     if let Some(fee) = metadata_fee {
         if fee < 0 {
             return Err(Error::InvalidParameters);
         }
     }
-    
+
     let config = storage::get_timelock_config(env);
     let current_time = env.ledger().timestamp();
     let execute_at = current_time
         .checked_add(config.delay_seconds)
         .ok_or(Error::ArithmeticError)?;
-    
+
     let change_id = storage::get_next_change_id(env)?;
-    
+
     let pending_change = PendingChange {
         id: change_id,
         change_type: ChangeType::FeeUpdate,
@@ -107,10 +109,10 @@ pub fn schedule_fee_update(
         paused: None,
         treasury: None,
     };
-    
+
     storage::set_pending_change(env, change_id, &pending_change);
     events::emit_change_scheduled(env, change_id, ChangeType::FeeUpdate, execute_at);
-    
+
     Ok(change_id)
 }
 
@@ -128,26 +130,22 @@ pub fn schedule_fee_update(
 ///
 /// # Errors
 /// * `Error::Unauthorized` - Caller is not the admin
-pub fn schedule_pause_update(
-    env: &Env,
-    admin: &Address,
-    paused: bool,
-) -> Result<u64, Error> {
+pub fn schedule_pause_update(env: &Env, admin: &Address, paused: bool) -> Result<u64, Error> {
     admin.require_auth();
-    
+
     let current_admin = storage::get_admin(env);
     if *admin != current_admin {
         return Err(Error::Unauthorized);
     }
-    
+
     let config = storage::get_timelock_config(env);
     let current_time = env.ledger().timestamp();
     let execute_at = current_time
         .checked_add(config.delay_seconds)
         .ok_or(Error::ArithmeticError)?;
-    
+
     let change_id = storage::get_next_change_id(env)?;
-    
+
     let pending_change = PendingChange {
         id: change_id,
         change_type: ChangeType::PauseUpdate,
@@ -160,10 +158,10 @@ pub fn schedule_pause_update(
         paused: Some(paused),
         treasury: None,
     };
-    
+
     storage::set_pending_change(env, change_id, &pending_change);
     events::emit_change_scheduled(env, change_id, ChangeType::PauseUpdate, execute_at);
-    
+
     Ok(change_id)
 }
 
@@ -187,20 +185,20 @@ pub fn schedule_treasury_update(
     new_treasury: &Address,
 ) -> Result<u64, Error> {
     admin.require_auth();
-    
+
     let current_admin = storage::get_admin(env);
     if *admin != current_admin {
         return Err(Error::Unauthorized);
     }
-    
+
     let config = storage::get_timelock_config(env);
     let current_time = env.ledger().timestamp();
     let execute_at = current_time
         .checked_add(config.delay_seconds)
         .ok_or(Error::ArithmeticError)?;
-    
+
     let change_id = storage::get_next_change_id(env)?;
-    
+
     let pending_change = PendingChange {
         id: change_id,
         change_type: ChangeType::TreasuryUpdate,
@@ -213,10 +211,10 @@ pub fn schedule_treasury_update(
         paused: None,
         treasury: Some(new_treasury.clone()),
     };
-    
+
     storage::set_pending_change(env, change_id, &pending_change);
     events::emit_change_scheduled(env, change_id, ChangeType::TreasuryUpdate, execute_at);
-    
+
     Ok(change_id)
 }
 
@@ -234,18 +232,18 @@ pub fn schedule_treasury_update(
 /// * `Error::TimelockNotExpired` - Timelock period has not elapsed
 /// * `Error::ChangeAlreadyExecuted` - Change has already been executed
 pub fn execute_change(env: &Env, change_id: u64) -> Result<(), Error> {
-    let mut pending_change = storage::get_pending_change(env, change_id)
-        .ok_or(Error::TokenNotFound)?;
-    
+    let mut pending_change =
+        storage::get_pending_change(env, change_id).ok_or(Error::TokenNotFound)?;
+
     if pending_change.executed {
         return Err(Error::ChangeAlreadyExecuted);
     }
-    
+
     let current_time = env.ledger().timestamp();
     if current_time < pending_change.execute_at {
         return Err(Error::TimelockNotExpired);
     }
-    
+
     // Execute the change based on type
     match pending_change.change_type {
         ChangeType::FeeUpdate => {
@@ -255,9 +253,13 @@ pub fn execute_change(env: &Env, change_id: u64) -> Result<(), Error> {
             if let Some(fee) = pending_change.metadata_fee {
                 storage::set_metadata_fee(env, fee);
             }
-            
-            let new_base = pending_change.base_fee.unwrap_or_else(|| storage::get_base_fee(env));
-            let new_metadata = pending_change.metadata_fee.unwrap_or_else(|| storage::get_metadata_fee(env));
+
+            let new_base = pending_change
+                .base_fee
+                .unwrap_or_else(|| storage::get_base_fee(env));
+            let new_metadata = pending_change
+                .metadata_fee
+                .unwrap_or_else(|| storage::get_metadata_fee(env));
             events::emit_fees_updated(env, new_base, new_metadata);
         }
         ChangeType::PauseUpdate => {
@@ -277,13 +279,13 @@ pub fn execute_change(env: &Env, change_id: u64) -> Result<(), Error> {
             }
         }
     }
-    
+
     // Mark as executed
     pending_change.executed = true;
     storage::set_pending_change(env, change_id, &pending_change);
-    
+
     events::emit_change_executed(env, change_id, pending_change.change_type);
-    
+
     Ok(())
 }
 
@@ -303,22 +305,21 @@ pub fn execute_change(env: &Env, change_id: u64) -> Result<(), Error> {
 /// * `Error::ChangeAlreadyExecuted` - Change has already been executed
 pub fn cancel_change(env: &Env, admin: &Address, change_id: u64) -> Result<(), Error> {
     admin.require_auth();
-    
+
     let current_admin = storage::get_admin(env);
     if *admin != current_admin {
         return Err(Error::Unauthorized);
     }
-    
-    let pending_change = storage::get_pending_change(env, change_id)
-        .ok_or(Error::TokenNotFound)?;
-    
+
+    let pending_change = storage::get_pending_change(env, change_id).ok_or(Error::TokenNotFound)?;
+
     if pending_change.executed {
         return Err(Error::ChangeAlreadyExecuted);
     }
-    
+
     storage::remove_pending_change(env, change_id);
     events::emit_change_cancelled(env, change_id, pending_change.change_type);
-    
+
     Ok(())
 }
 
@@ -352,80 +353,75 @@ pub fn get_timelock_config(env: &Env) -> TimelockConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use soroban_sdk::{testutils::{Address as _, Ledger, LedgerInfo}, Env};
-    
+    use soroban_sdk::{
+        testutils::{Address as _, Ledger, LedgerInfo},
+        Env,
+    };
+
     fn setup() -> (Env, Address) {
         let env = Env::default();
         env.mock_all_auths();
-        
+
         let admin = Address::generate(&env);
         storage::set_admin(&env, &admin);
         storage::set_treasury(&env, &Address::generate(&env));
         storage::set_base_fee(&env, 1_000_000);
         storage::set_metadata_fee(&env, 500_000);
-        
+
         initialize_timelock(&env, Some(3600)).unwrap(); // 1 hour
-        
+
         (env, admin)
     }
-    
+
     #[test]
     fn test_schedule_fee_update() {
         let (env, admin) = setup();
-        
+
         let change_id = schedule_fee_update(&env, &admin, Some(2_000_000), None).unwrap();
-        
+
         let pending = get_pending_change(&env, change_id).unwrap();
         assert_eq!(pending.base_fee, Some(2_000_000));
         assert!(!pending.executed);
     }
-    
+
     #[test]
     fn test_execute_change_before_timelock_fails() {
         let (env, admin) = setup();
-        
+
         let change_id = schedule_fee_update(&env, &admin, Some(2_000_000), None).unwrap();
-        
+
         let result = execute_change(&env, change_id);
         assert_eq!(result, Err(Error::TimelockNotExpired));
     }
-    
+
     #[test]
     fn test_execute_change_after_timelock_succeeds() {
         let (env, admin) = setup();
-        
+
         let change_id = schedule_fee_update(&env, &admin, Some(2_000_000), None).unwrap();
-        
+
         // Advance time by 1 hour + 1 second
         env.ledger().with_mut(|li| {
             li.timestamp += 3601;
         });
 
-
-
-
-
-
-
-        
         assert_eq!(storage::get_base_fee(&env), 2_000_000);
-        
+
         let pending = get_pending_change(&env, change_id).unwrap();
         assert!(pending.executed);
     }
-    
+
     #[test]
     fn test_cancel_pending_change() {
         let (env, admin) = setup();
-        
+
         let change_id = schedule_fee_update(&env, &admin, Some(2_000_000), None).unwrap();
-        
+
         cancel_change(&env, &admin, change_id).unwrap();
-        
+
         assert!(get_pending_change(&env, change_id).is_none());
     }
 }
-
 
 // ── Governance proposal functions ─────────────────────────────────────────
 
@@ -475,17 +471,17 @@ pub fn create_proposal(
 
     // Validate time windows
     let current_time = env.ledger().timestamp();
-    
+
     // start_time must be in the future or now
     if start_time < current_time {
         return Err(Error::InvalidTimeWindow);
     }
-    
+
     // end_time must be after start_time
     if end_time <= start_time {
         return Err(Error::InvalidTimeWindow);
     }
-    
+
     // eta must be after end_time
     if eta <= end_time {
         return Err(Error::InvalidTimeWindow);
@@ -550,39 +546,38 @@ pub fn get_proposal(env: &Env, proposal_id: u64) -> Option<Proposal> {
     storage::get_proposal(env, proposal_id)
 }
 
-
 #[cfg(test)]
 mod proposal_tests {
     use super::*;
-    use soroban_sdk::{testutils::Address as _, Env, vec};
     use soroban_sdk::testutils::Ledger;
-    
+    use soroban_sdk::{testutils::Address as _, vec, Env};
+
     fn setup_for_proposals() -> (Env, Address) {
         let env = Env::default();
         env.mock_all_auths();
-        
+
         let admin = Address::generate(&env);
         storage::set_admin(&env, &admin);
         storage::set_treasury(&env, &Address::generate(&env));
         storage::set_base_fee(&env, 1_000_000);
         storage::set_metadata_fee(&env, 500_000);
-        
+
         initialize_timelock(&env, Some(3600)).unwrap();
-        
+
         (env, admin)
     }
-    
+
     #[test]
     fn test_create_proposal_valid() {
         let (env, admin) = setup_for_proposals();
-        
+
         let current_time = env.ledger().timestamp();
         let start_time = current_time + 100;
         let end_time = start_time + 86400; // 1 day voting period
         let eta = end_time + 3600; // 1 hour after voting ends
-        
+
         let payload = Bytes::from_slice(&env, &[1u8, 2u8, 3u8]);
-        
+
         let proposal_id = create_proposal(
             &env,
             &admin,
@@ -591,11 +586,12 @@ mod proposal_tests {
             start_time,
             end_time,
             eta,
-        ).unwrap();
-        
+        )
+        .unwrap();
+
         assert_eq!(proposal_id, 0);
         assert_eq!(storage::get_proposal_count(&env), 1);
-        
+
         let proposal = get_proposal(&env, proposal_id).unwrap();
         assert_eq!(proposal.id, proposal_id);
         assert_eq!(proposal.proposer, admin);
@@ -606,19 +602,19 @@ mod proposal_tests {
         assert_eq!(proposal.eta, eta);
         assert_eq!(proposal.created_at, current_time);
     }
-    
+
     #[test]
     fn test_create_proposal_unauthorized() {
         let (env, _admin) = setup_for_proposals();
-        
+
         let unauthorized = Address::generate(&env);
         let current_time = env.ledger().timestamp();
         let start_time = current_time + 100;
         let end_time = start_time + 86400;
         let eta = end_time + 3600;
-        
+
         let payload = Bytes::from_slice(&env, &[1u8, 2u8, 3u8]);
-        
+
         let result = create_proposal(
             &env,
             &unauthorized,
@@ -628,21 +624,21 @@ mod proposal_tests {
             end_time,
             eta,
         );
-        
+
         assert_eq!(result, Err(Error::Unauthorized));
     }
-    
+
     #[test]
     fn test_create_proposal_start_time_in_past() {
         let (env, admin) = setup_for_proposals();
-        
+
         let current_time = env.ledger().timestamp();
         let start_time = current_time - 100; // In the past
         let end_time = current_time + 86400;
         let eta = end_time + 3600;
-        
+
         let payload = Bytes::from_slice(&env, &[1u8, 2u8, 3u8]);
-        
+
         let result = create_proposal(
             &env,
             &admin,
@@ -652,21 +648,21 @@ mod proposal_tests {
             end_time,
             eta,
         );
-        
+
         assert_eq!(result, Err(Error::InvalidTimeWindow));
     }
-    
+
     #[test]
     fn test_create_proposal_end_before_start() {
         let (env, admin) = setup_for_proposals();
-        
+
         let current_time = env.ledger().timestamp();
         let start_time = current_time + 100;
         let end_time = start_time - 10; // Before start
         let eta = end_time + 3600;
-        
+
         let payload = Bytes::from_slice(&env, &[1u8, 2u8, 3u8]);
-        
+
         let result = create_proposal(
             &env,
             &admin,
@@ -676,21 +672,21 @@ mod proposal_tests {
             end_time,
             eta,
         );
-        
+
         assert_eq!(result, Err(Error::InvalidTimeWindow));
     }
-    
+
     #[test]
     fn test_create_proposal_eta_before_end() {
         let (env, admin) = setup_for_proposals();
-        
+
         let current_time = env.ledger().timestamp();
         let start_time = current_time + 100;
         let end_time = start_time + 86400;
         let eta = end_time - 100; // Before end time
-        
+
         let payload = Bytes::from_slice(&env, &[1u8, 2u8, 3u8]);
-        
+
         let result = create_proposal(
             &env,
             &admin,
@@ -700,25 +696,25 @@ mod proposal_tests {
             end_time,
             eta,
         );
-        
+
         assert_eq!(result, Err(Error::InvalidTimeWindow));
     }
-    
+
     #[test]
     fn test_create_proposal_payload_too_large() {
         let (env, admin) = setup_for_proposals();
-        
+
         let current_time = env.ledger().timestamp();
         let start_time = current_time + 100;
         let end_time = start_time + 86400;
         let eta = end_time + 3600;
-        
+
         // Create payload larger than MAX_PAYLOAD_SIZE (1024 bytes)
         let mut large_payload = Bytes::new(&env);
         for _ in 0..1025 {
             large_payload.append(&Bytes::from_slice(&env, &[1u8]));
         }
-        
+
         let result = create_proposal(
             &env,
             &admin,
@@ -728,25 +724,25 @@ mod proposal_tests {
             end_time,
             eta,
         );
-        
+
         assert_eq!(result, Err(Error::PayloadTooLarge));
     }
-    
+
     #[test]
     fn test_create_proposal_max_payload_size() {
         let (env, admin) = setup_for_proposals();
-        
+
         let current_time = env.ledger().timestamp();
         let start_time = current_time + 100;
         let end_time = start_time + 86400;
         let eta = end_time + 3600;
-        
+
         // Create payload exactly at MAX_PAYLOAD_SIZE (1024 bytes)
         let mut max_payload = Bytes::new(&env);
         for _ in 0..1024 {
             max_payload.append(&Bytes::from_slice(&env, &[1u8]));
         }
-        
+
         let proposal_id = create_proposal(
             &env,
             &admin,
@@ -755,19 +751,20 @@ mod proposal_tests {
             start_time,
             end_time,
             eta,
-        ).unwrap();
-        
+        )
+        .unwrap();
+
         let proposal = get_proposal(&env, proposal_id).unwrap();
         assert_eq!(proposal.payload.len(), 1024);
     }
-    
+
     #[test]
     fn test_create_multiple_proposals() {
         let (env, admin) = setup_for_proposals();
-        
+
         let current_time = env.ledger().timestamp();
         let payload = Bytes::from_slice(&env, &[1u8, 2u8, 3u8]);
-        
+
         // Create first proposal
         let proposal_id_1 = create_proposal(
             &env,
@@ -777,8 +774,9 @@ mod proposal_tests {
             current_time + 100,
             current_time + 86500,
             current_time + 90100,
-        ).unwrap();
-        
+        )
+        .unwrap();
+
         // Create second proposal
         let proposal_id_2 = create_proposal(
             &env,
@@ -788,29 +786,30 @@ mod proposal_tests {
             current_time + 200,
             current_time + 86600,
             current_time + 90200,
-        ).unwrap();
-        
+        )
+        .unwrap();
+
         assert_eq!(proposal_id_1, 0);
         assert_eq!(proposal_id_2, 1);
         assert_eq!(storage::get_proposal_count(&env), 2);
-        
+
         let prop1 = get_proposal(&env, proposal_id_1).unwrap();
         let prop2 = get_proposal(&env, proposal_id_2).unwrap();
-        
+
         assert_eq!(prop1.action_type, ActionType::FeeChange);
         assert_eq!(prop2.action_type, ActionType::TreasuryChange);
     }
-    
+
     #[test]
     fn test_create_proposal_different_action_types() {
         let (env, admin) = setup_for_proposals();
-        
+
         let current_time = env.ledger().timestamp();
         let start_time = current_time + 100;
         let end_time = start_time + 86400;
         let eta = end_time + 3600;
         let payload = Bytes::from_slice(&env, &[1u8, 2u8, 3u8]);
-        
+
         // Test all action types
         let action_types = vec![
             &env,
@@ -820,7 +819,7 @@ mod proposal_tests {
             ActionType::UnpauseContract,
             ActionType::PolicyUpdate,
         ];
-        
+
         for (i, action_type) in action_types.iter().enumerate() {
             let proposal_id = create_proposal(
                 &env,
@@ -830,34 +829,35 @@ mod proposal_tests {
                 start_time + (i as u64 * 1000),
                 end_time + (i as u64 * 1000),
                 eta + (i as u64 * 1000),
-            ).unwrap();
-            
+            )
+            .unwrap();
+
             let proposal = get_proposal(&env, proposal_id).unwrap();
             assert_eq!(proposal.action_type, action_type);
         }
-        
+
         assert_eq!(storage::get_proposal_count(&env), 5);
     }
-    
+
     #[test]
     fn test_get_nonexistent_proposal() {
         let (env, _admin) = setup_for_proposals();
-        
+
         let result = get_proposal(&env, 999);
         assert!(result.is_none());
     }
-    
+
     #[test]
     fn test_create_proposal_empty_payload() {
         let (env, admin) = setup_for_proposals();
-        
+
         let current_time = env.ledger().timestamp();
         let start_time = current_time + 100;
         let end_time = start_time + 86400;
         let eta = end_time + 3600;
-        
+
         let empty_payload = Bytes::new(&env);
-        
+
         let proposal_id = create_proposal(
             &env,
             &admin,
@@ -866,13 +866,13 @@ mod proposal_tests {
             start_time,
             end_time,
             eta,
-        ).unwrap();
-        
+        )
+        .unwrap();
+
         let proposal = get_proposal(&env, proposal_id).unwrap();
         assert_eq!(proposal.payload.len(), 0);
     }
 }
-
 
 /// Vote on a governance proposal
 ///
@@ -904,21 +904,20 @@ pub fn vote_proposal(
     support: VoteChoice,
 ) -> Result<(), Error> {
     use crate::proposal_state_machine::ProposalStateMachine;
-    
+
     // Verify voter authentication
     voter.require_auth();
 
     // Get proposal
-    let mut proposal = storage::get_proposal(env, proposal_id)
-        .ok_or(Error::ProposalNotFound)?;
+    let mut proposal = storage::get_proposal(env, proposal_id).ok_or(Error::ProposalNotFound)?;
 
     // Validate voting window
     let current_time = env.ledger().timestamp();
-    
+
     if current_time < proposal.start_time {
         return Err(Error::VotingNotStarted);
     }
-    
+
     if current_time >= proposal.end_time {
         return Err(Error::VotingEnded);
     }
@@ -927,7 +926,7 @@ pub fn vote_proposal(
     if proposal.state == crate::types::ProposalState::Created {
         ProposalStateMachine::validate_transition(
             proposal.state,
-            crate::types::ProposalState::Active
+            crate::types::ProposalState::Active,
         )?;
         proposal.state = crate::types::ProposalState::Active;
     }
@@ -948,15 +947,21 @@ pub fn vote_proposal(
     // Update vote counts
     match support {
         VoteChoice::For => {
-            proposal.votes_for = proposal.votes_for.checked_add(1)
+            proposal.votes_for = proposal
+                .votes_for
+                .checked_add(1)
                 .expect("Vote count overflow");
         }
         VoteChoice::Against => {
-            proposal.votes_against = proposal.votes_against.checked_add(1)
+            proposal.votes_against = proposal
+                .votes_against
+                .checked_add(1)
                 .expect("Vote count overflow");
         }
         VoteChoice::Abstain => {
-            proposal.votes_abstain = proposal.votes_abstain.checked_add(1)
+            proposal.votes_abstain = proposal
+                .votes_abstain
+                .checked_add(1)
                 .expect("Vote count overflow");
         }
     }
@@ -982,8 +987,7 @@ pub fn vote_proposal(
 /// * `Some((u32, u32, u32))` - (votes_for, votes_against, votes_abstain)
 /// * `None` - If proposal doesn't exist
 pub fn get_vote_counts(env: &Env, proposal_id: u64) -> Option<(i128, i128, i128)> {
-    storage::get_proposal(env, proposal_id)
-        .map(|p| (p.votes_for, p.votes_against, p.votes_abstain))
+    storage::get_proposal(env, proposal_id).map(|p| (p.votes_for, p.votes_against, p.votes_abstain))
 }
 
 /// Check if an address has voted on a proposal
@@ -1016,17 +1020,13 @@ pub fn has_voted(env: &Env, proposal_id: u64, voter: &Address) -> bool {
 /// * `Error::ProposalNotFound` - If proposal doesn't exist
 /// * `Error::VotingNotStarted` - If voting hasn't started
 /// * `Error::VotingEnded` - If voting is still ongoing
-pub fn finalize_proposal(
-    env: &Env,
-    proposal_id: u64,
-) -> Result<(), Error> {
+pub fn finalize_proposal(env: &Env, proposal_id: u64) -> Result<(), Error> {
     use crate::proposal_state_machine::ProposalStateMachine;
-    
-    let mut proposal = storage::get_proposal(env, proposal_id)
-        .ok_or(Error::ProposalNotFound)?;
+
+    let mut proposal = storage::get_proposal(env, proposal_id).ok_or(Error::ProposalNotFound)?;
 
     let current_time = env.ledger().timestamp();
-    
+
     // Ensure voting has ended
     if current_time < proposal.end_time {
         return Err(Error::VotingEnded);
@@ -1048,7 +1048,7 @@ pub fn finalize_proposal(
 
     // Validate transition
     ProposalStateMachine::validate_transition(proposal.state, new_state)?;
-    
+
     proposal.state = new_state;
     storage::set_proposal(env, proposal_id, &proposal);
 
@@ -1077,26 +1077,22 @@ pub fn finalize_proposal(
 ///
 /// # Events
 /// Emits `proposal_queued` event on success
-pub fn queue_proposal(
-    env: &Env,
-    proposal_id: u64,
-) -> Result<(), Error> {
+pub fn queue_proposal(env: &Env, proposal_id: u64) -> Result<(), Error> {
     use crate::proposal_state_machine::ProposalStateMachine;
-    
+
     // First, finalize the proposal if it's still Active
     finalize_proposal(env, proposal_id)?;
-    
+
     // Get proposal
-    let mut proposal = storage::get_proposal(env, proposal_id)
-        .ok_or(Error::ProposalNotFound)?;
+    let mut proposal = storage::get_proposal(env, proposal_id).ok_or(Error::ProposalNotFound)?;
 
     // Validate voting has ended
     let current_time = env.ledger().timestamp();
-    
+
     if current_time < proposal.start_time {
         return Err(Error::VotingNotStarted);
     }
-    
+
     if current_time < proposal.end_time {
         return Err(Error::VotingEnded);
     }
@@ -1117,11 +1113,8 @@ pub fn queue_proposal(
     }
 
     // Transition to Queued state
-    ProposalStateMachine::validate_transition(
-        proposal.state,
-        crate::types::ProposalState::Queued
-    )?;
-    
+    ProposalStateMachine::validate_transition(proposal.state, crate::types::ProposalState::Queued)?;
+
     proposal.state = crate::types::ProposalState::Queued;
 
     // Update proposal in storage
@@ -1133,14 +1126,10 @@ pub fn queue_proposal(
     Ok(())
 }
 
-pub fn execute_proposal(
-    env: &Env,
-    proposal_id: u64,
-) -> Result<(), Error> {
+pub fn execute_proposal(env: &Env, proposal_id: u64) -> Result<(), Error> {
     use crate::proposal_state_machine::ProposalStateMachine;
-    
-    let mut proposal = storage::get_proposal(env, proposal_id)
-        .ok_or(Error::ProposalNotFound)?;
+
+    let mut proposal = storage::get_proposal(env, proposal_id).ok_or(Error::ProposalNotFound)?;
 
     // Check if proposal can be executed (must be in Queued state)
     if !ProposalStateMachine::can_execute(proposal.state) {
@@ -1167,14 +1156,13 @@ pub fn execute_proposal(
             if proposal.payload.len() >= 8 {
                 let base_fee = 2_000_000_i128;
                 let metadata_fee = 750_000_i128;
-                
+
                 storage::set_base_fee(env, base_fee);
                 storage::set_metadata_fee(env, metadata_fee);
                 events::emit_fees_updated(env, base_fee, metadata_fee);
             }
         }
-        ActionType::TreasuryChange => {
-        }
+        ActionType::TreasuryChange => {}
         ActionType::PauseContract => {
             storage::set_paused(env, true);
             events::emit_pause(env, &proposal.proposer);
@@ -1183,8 +1171,7 @@ pub fn execute_proposal(
             storage::set_paused(env, false);
             events::emit_unpause(env, &proposal.proposer);
         }
-        ActionType::PolicyUpdate => {
-        }
+        ActionType::PolicyUpdate => {}
     }
 
     // Transition to Executed state
@@ -1192,9 +1179,9 @@ pub fn execute_proposal(
     let current_state = ProposalStateMachine::get_proposal_state(env, &proposal, &config);
     ProposalStateMachine::validate_transition(
         current_state,
-        crate::types::ProposalState::Executed
+        crate::types::ProposalState::Executed,
     )?;
-    
+
     proposal.state = crate::types::ProposalState::Executed;
     proposal.executed_at = Some(current_time);
     storage::set_proposal(env, proposal_id, &proposal);

@@ -1,6 +1,6 @@
-use soroban_sdk::{symbol_short, Address, Env};
 use crate::storage;
 use crate::types::Error;
+use soroban_sdk::{symbol_short, Address, Env};
 
 const MAX_BATCH_BURN: u32 = 100;
 
@@ -21,12 +21,21 @@ pub fn burn(env: &Env, caller: Address, token_index: u32, amount: i128) -> Resul
     }
 
     let new_balance = balance.checked_sub(amount).ok_or(Error::ArithmeticError)?;
-    let new_supply  = info.total_supply.checked_sub(amount).ok_or(Error::ArithmeticError)?;
+    let new_supply = info
+        .total_supply
+        .checked_sub(amount)
+        .ok_or(Error::ArithmeticError)?;
 
     storage::set_balance(env, token_index, &caller, new_balance);
     info.total_supply = new_supply;
-    info.total_burned = info.total_burned.checked_add(amount).ok_or(Error::ArithmeticError)?;
-    info.burn_count = info.burn_count.checked_add(1).ok_or(Error::ArithmeticError)?;
+    info.total_burned = info
+        .total_burned
+        .checked_add(amount)
+        .ok_or(Error::ArithmeticError)?;
+    info.burn_count = info
+        .burn_count
+        .checked_add(1)
+        .ok_or(Error::ArithmeticError)?;
     storage::set_token_info(env, token_index, &info);
 
     // 8. Emit event — after state is fully committed
@@ -67,12 +76,21 @@ pub fn admin_burn(
     }
 
     let new_balance = balance.checked_sub(amount).ok_or(Error::ArithmeticError)?;
-    let new_supply  = info.total_supply.checked_sub(amount).ok_or(Error::ArithmeticError)?;
+    let new_supply = info
+        .total_supply
+        .checked_sub(amount)
+        .ok_or(Error::ArithmeticError)?;
 
     storage::set_balance(env, token_index, &holder, new_balance);
     info.total_supply = new_supply;
-    info.total_burned = info.total_burned.checked_add(amount).ok_or(Error::ArithmeticError)?;
-    info.burn_count = info.burn_count.checked_add(1).ok_or(Error::ArithmeticError)?;
+    info.total_burned = info
+        .total_burned
+        .checked_add(amount)
+        .ok_or(Error::ArithmeticError)?;
+    info.burn_count = info
+        .burn_count
+        .checked_add(1)
+        .ok_or(Error::ArithmeticError)?;
     storage::set_token_info(env, token_index, &info);
 
     // 8. Emit event with both admin and holder for auditability
@@ -121,7 +139,9 @@ pub fn batch_burn(
         if balance < amount {
             return Err(Error::InsufficientBalance);
         }
-        total_burn = total_burn.checked_add(amount).ok_or(Error::ArithmeticError)?;
+        total_burn = total_burn
+            .checked_add(amount)
+            .ok_or(Error::ArithmeticError)?;
     }
 
     if info.total_supply < total_burn {
@@ -131,20 +151,36 @@ pub fn batch_burn(
     // Mutation pass
     for i in 0..burns.len() {
         let (ref holder, amount) = burns.get(i).unwrap();
-        let balance     = storage::get_balance(env, token_index, holder);
+        let balance = storage::get_balance(env, token_index, holder);
         let new_balance = balance.checked_sub(amount).ok_or(Error::ArithmeticError)?;
         storage::set_balance(env, token_index, holder, new_balance);
     }
 
-    let new_supply = info.total_supply.checked_sub(total_burn).ok_or(Error::ArithmeticError)?;
+    let new_supply = info
+        .total_supply
+        .checked_sub(total_burn)
+        .ok_or(Error::ArithmeticError)?;
     info.total_supply = new_supply;
-    info.total_burned = info.total_burned.checked_add(total_burn).ok_or(Error::ArithmeticError)?;
-    info.burn_count = info.burn_count.checked_add(burns.len()).ok_or(Error::ArithmeticError)?;
+    info.total_burned = info
+        .total_burned
+        .checked_add(total_burn)
+        .ok_or(Error::ArithmeticError)?;
+    info.burn_count = info
+        .burn_count
+        .checked_add(burns.len())
+        .ok_or(Error::ArithmeticError)?;
     storage::set_token_info(env, token_index, &info);
     storage::increment_burn_count(env, token_index)?;
     storage::add_total_burned(env, token_index, total_burn);
 
-    emit_batch_burn_event(env, token_index, &admin, burns.len(), total_burn, new_supply);
+    emit_batch_burn_event(
+        env,
+        token_index,
+        &admin,
+        burns.len(),
+        total_burn,
+        new_supply,
+    );
     Ok(())
 }
 
@@ -173,19 +209,19 @@ fn validate_address(addr: &Address) -> Result<(), Error> {
 // ─────────────────────────────────────────────
 
 /// Emit burn event (v1)
-/// 
+///
 /// **Schema Version**: 1
 /// **Event Name**: burn_v1
-/// 
+///
 /// **Topics** (indexed):
 /// - Event name: "burn_v1"
 /// - token_index: u32 - The token index
-/// 
+///
 /// **Payload** (non-indexed):
 /// - caller: Address - The address that burned tokens
 /// - amount: i128 - The amount burned
 /// - new_supply: i128 - The new total supply after burn
-/// 
+///
 /// **Schema Stability**: This schema is immutable. Any changes require a new version.
 fn emit_burn_event(env: &Env, token_index: u32, caller: &Address, amount: i128, new_supply: i128) {
     env.events().publish(
@@ -195,20 +231,20 @@ fn emit_burn_event(env: &Env, token_index: u32, caller: &Address, amount: i128, 
 }
 
 /// Emit admin burn event (v1)
-/// 
+///
 /// **Schema Version**: 1
 /// **Event Name**: adm_bn_v1
-/// 
+///
 /// **Topics** (indexed):
 /// - Event name: "adm_bn_v1"
 /// - token_index: u32 - The token index
-/// 
+///
 /// **Payload** (non-indexed):
 /// - admin: Address - The admin who initiated the burn
 /// - holder: Address - The address whose tokens were burned
 /// - amount: i128 - The amount burned
 /// - new_supply: i128 - The new total supply after burn
-/// 
+///
 /// **Schema Stability**: This schema is immutable. Any changes require a new version.
 fn emit_admin_burn_event(
     env: &Env,
@@ -225,20 +261,20 @@ fn emit_admin_burn_event(
 }
 
 /// Emit batch burn event (v1)
-/// 
+///
 /// **Schema Version**: 1
 /// **Event Name**: bch_bn_v1
-/// 
+///
 /// **Topics** (indexed):
 /// - Event name: "bch_bn_v1"
 /// - token_index: u32 - The token index
-/// 
+///
 /// **Payload** (non-indexed):
 /// - admin: Address - The admin who initiated the batch burn
 /// - count: u32 - The number of burns in the batch
 /// - total_burned: i128 - The total amount burned across all burns
 /// - new_supply: i128 - The new total supply after batch burn
-/// 
+///
 /// **Schema Stability**: This schema is immutable. Any changes require a new version.
 fn emit_batch_burn_event(
     env: &Env,

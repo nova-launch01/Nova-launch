@@ -41,8 +41,8 @@ pub fn freeze_address(
     admin.require_auth();
 
     // Verify token exists and get info
-    let token_info = storage::get_token_info_by_address(env, token_address)
-        .ok_or(Error::TokenNotFound)?;
+    let token_info =
+        storage::get_token_info_by_address(env, token_address).ok_or(Error::TokenNotFound)?;
 
     // Verify admin is the token creator
     if token_info.creator != *admin {
@@ -115,8 +115,8 @@ pub fn unfreeze_address(
     admin.require_auth();
 
     // Verify token exists and get info
-    let token_info = storage::get_token_info_by_address(env, token_address)
-        .ok_or(Error::TokenNotFound)?;
+    let token_info =
+        storage::get_token_info_by_address(env, token_address).ok_or(Error::TokenNotFound)?;
 
     // Verify admin is the token creator
     if token_info.creator != *admin {
@@ -192,8 +192,8 @@ pub fn set_freeze_enabled(
     admin.require_auth();
 
     // Get token info
-    let mut token_info = storage::get_token_info_by_address(env, token_address)
-        .ok_or(Error::TokenNotFound)?;
+    let mut token_info =
+        storage::get_token_info_by_address(env, token_address).ok_or(Error::TokenNotFound)?;
 
     // Verify admin is the token creator
     if token_info.creator != *admin {

@@ -1,9 +1,9 @@
 /// Event Version Constants
-/// 
+///
 /// This module defines version identifiers for all event schemas in the token factory contract.
-/// 
+///
 /// # Version Management
-/// 
+///
 /// When introducing a new event version:
 /// 1. Create a new constant with an incremented version number (e.g., `INIT_VERSION_V2 = 2`)
 /// 2. Update the event emission function to use the new version
@@ -11,14 +11,14 @@
 /// 4. Update tests to validate both versions during the migration period
 /// 5. Emit both old and new versions during the transition period
 /// 6. Remove the old version after the deprecation timeline
-/// 
+///
 /// # Schema Immutability
-/// 
+///
 /// Once an event version is deployed, its schema MUST NOT be modified:
 /// - Topic structure (indexed parameters) must remain unchanged
 /// - Payload structure (non-indexed data) must remain unchanged
 /// - Data types for all parameters must remain unchanged
-/// 
+///
 /// Any schema changes require creating a new version with an incremented version number.
 
 // Current event versions (all v1)

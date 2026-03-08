@@ -3,8 +3,8 @@
 //! Enforces legal state transitions for proposal lifecycle.
 //! Implements a strict state machine to prevent invalid state changes.
 
+use crate::types::{ActionType, Error, GovernanceConfig, Proposal, ProposalState};
 use soroban_sdk::vec;
-use crate::types::{Error, Proposal, ProposalState, ActionType, GovernanceConfig};
 
 /// State machine for proposal lifecycle
 ///
@@ -16,7 +16,7 @@ use crate::types::{Error, Proposal, ProposalState, ActionType, GovernanceConfig}
 /// Active -> Succeeded | Defeated | Expired
 /// Succeeded -> Queued
 /// Queued -> Executed | Expired
-/// 
+///
 /// Terminal States (no transitions allowed):
 /// - Defeated
 /// - Executed
@@ -90,7 +90,10 @@ impl ProposalStateMachine {
     }
 
     /// Get the next valid states from the current state
-    pub fn get_valid_next_states(env: &soroban_sdk::Env, state: ProposalState) -> soroban_sdk::Vec<ProposalState> {
+    pub fn get_valid_next_states(
+        env: &soroban_sdk::Env,
+        state: ProposalState,
+    ) -> soroban_sdk::Vec<ProposalState> {
         match state {
             ProposalState::Created => vec![env, ProposalState::Active, ProposalState::Cancelled],
             ProposalState::Active => vec![
@@ -147,26 +150,27 @@ impl ProposalStateMachine {
         }
 
         let current_time = env.ledger().timestamp();
-        
+
         if current_time < proposal.created_at {
             return ProposalState::Created;
         }
-        
+
         if current_time <= proposal.end_time {
             return ProposalState::Active;
         }
-        
+
         // Check if successful
         let total_votes = proposal.votes_for + proposal.votes_against + proposal.votes_abstain;
         let total_possible_votes = 1_000_000_000; // Simplified for tests
-        
-        let quorum_met = (total_votes * 100 / total_possible_votes) >= config.quorum_percent as i128;
+
+        let quorum_met =
+            (total_votes * 100 / total_possible_votes) >= config.quorum_percent as i128;
         let approval_met = if total_votes > 0 {
             (proposal.votes_for * 100 / total_votes) >= config.approval_percent as i128
         } else {
             false
         };
-        
+
         if quorum_met && approval_met {
             // Need to check if it's queued or succeeded
             // For now, if current_time > voting_ends_at but not executed/cancelled, it's Succeeded (or Queued)
@@ -392,7 +396,8 @@ mod tests {
     #[test]
     fn test_get_valid_next_states() {
         let env = soroban_sdk::Env::default();
-        let created_next = ProposalStateMachine::get_valid_next_states(&env, ProposalState::Created);
+        let created_next =
+            ProposalStateMachine::get_valid_next_states(&env, ProposalState::Created);
         assert_eq!(created_next.len(), 2);
         assert!(created_next.contains(ProposalState::Active));
         assert!(created_next.contains(ProposalState::Cancelled));
@@ -404,7 +409,8 @@ mod tests {
         assert!(active_next.contains(ProposalState::Expired));
         assert!(active_next.contains(ProposalState::Cancelled));
 
-        let executed_next = ProposalStateMachine::get_valid_next_states(&env, ProposalState::Executed);
+        let executed_next =
+            ProposalStateMachine::get_valid_next_states(&env, ProposalState::Executed);
         assert_eq!(executed_next.len(), 0);
     }
 

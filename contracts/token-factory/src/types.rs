@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use soroban_sdk::{self, contracterror, contracttype, Address, Env, String, Vec, Bytes};
+use soroban_sdk::{self, contracterror, contracttype, Address, Bytes, Env, String, Vec};
 
 /// Factory state containing administrative configuration
 ///
@@ -122,10 +122,10 @@ pub struct StreamParams {
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TokenStats {
-    pub current_supply: i128,  // live circulating supply
-    pub total_burned:   i128,  // cumulative amount burned since creation
-    pub burn_count:     u32,
-    pub is_paused:      bool,
+    pub current_supply: i128, // live circulating supply
+    pub total_burned: i128,   // cumulative amount burned since creation
+    pub burn_count: u32,
+    pub is_paused: bool,
     pub clawback_enabled: bool,
     pub freeze_enabled: bool,
 }
@@ -488,4 +488,3 @@ pub struct WithdrawalPeriod {
     pub period_start: u64,
     pub amount_withdrawn: i128,
 }
-
