@@ -12,6 +12,8 @@ mod validation;
 mod timelock;
 mod pagination;
 mod mint;
+use soroban_sdk::{contract, contractimpl, Address, Env, String, Vec};
+use types::{Error, FactoryState, TokenInfo, TokenStats};
 mod treasury;
 mod stream_types;
 mod differential_engine;
@@ -550,6 +552,9 @@ impl TokenFactory {
         
         // Emit optimized event
         events::emit_fees_updated(&env, new_base_fee, new_metadata_fee);
+        Ok(())
+    }
+
 
         Ok(())
     }
@@ -651,6 +656,17 @@ impl TokenFactory {
 
 
 
+    if storage::is_token_paused(&env, index) {   // ADD
+        return Err(Error::TokenPaused);          // ADD
+    }                                            // ADD
+    if info.metadata_uri.is_some() {
+        return Err(Error::MetadataAlreadySet);
+    }
+    info.metadata_uri = Some(new_metadata_uri);
+    storage::set_token_info(&env, index, &info);
+    Ok(())
+}
+
     /// Get token information by contract address
     ///
     /// Retrieves complete information about a token using its
@@ -736,6 +752,9 @@ impl TokenFactory {
 
         // Emit optimized event
         events::emit_clawback_toggled(&env, &token_address, &admin, enabled);
+        Ok(())
+    }
+
 
         Ok(())
     }
@@ -1781,6 +1800,7 @@ impl TokenFactory {
 // #[cfg(test)]
 // mod admin_transfer_test;
 
+#[cfg(test)]
 // #[cfg(test)]
 // mod fee_collection_test;
 
@@ -1799,6 +1819,11 @@ impl TokenFactory {
 // #[cfg(test)]
 // mod atomic_token_creation_test;
 
+#[cfg(test)]
+// mod burn_property_test;
+
+#[cfg(test)]
+// mod supply_conservation_test;
 // #[cfg(test)]
 // mod burn_property_test;
 
@@ -1832,6 +1857,27 @@ impl TokenFactory {
 // #[cfg(test)]
 // mod fuzz_test;
 
+#[cfg(test)]
+// mod token_pause_test;
+
+
+#[cfg(test)]
+// mod token_stats_test;
+
+// mod integration_test;
+
+mod gas_benchmark_comprehensive;
+#[cfg(test)]
+mod gas_regression_test;
+
+#[cfg(test)]
+// mod timelock_test;
+
+#[cfg(test)]
+// mod pagination_integration_test;
+
+#[cfg(test)]
+// mod treasury_integration_test;
 // #[cfg(test)]
 // mod token_pause_test;
 // #[cfg(test)]
