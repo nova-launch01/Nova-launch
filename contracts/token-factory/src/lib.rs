@@ -15,16 +15,12 @@ mod stream_types;
 #[cfg(test)]
 mod test_helpers;
 mod timelock;
+mod token_creation;
 mod treasury;
 mod types;
-mod token_creation;
-mod stream_types;
-mod vesting;
-mod timelock;
 mod validation;
-mod pagination;
-mod mint;
-mod treasury;
+mod vault;
+mod vesting;
 
 // #[cfg(test)]
 // mod stream_metadata_update_test;
@@ -1487,6 +1483,48 @@ impl TokenFactory {
 
     pub fn get_vault(env: Env, vault_id: u64) -> Result<Vault, Error> {
         storage::get_vault(&env, vault_id).ok_or(Error::TokenNotFound)
+    }
+
+    /// Fund a vault with tokens
+    ///
+    /// Allows controlled funding of vault balances with strict safety checks.
+    /// The funder must be authorized and the vault must be in an active state.
+    ///
+    /// # Arguments
+    /// * `env` - The contract environment
+    /// * `vault_id` - The unique identifier of the vault to fund
+    /// * `funder` - Address providing the funds (must authorize)
+    /// * `amount` - Amount of tokens to add to the vault (must be > 0)
+    ///
+    /// # Returns
+    /// Returns `Ok(())` on success
+    ///
+    /// # Errors
+    /// * `Error::TokenNotFound` - Vault with given ID does not exist
+    /// * `Error::InvalidAmount` - Amount is zero or negative
+    /// * `Error::Unauthorized` - Funder is not authorized
+    /// * `Error::InvalidParameters` - Vault status does not allow funding
+    /// * `Error::ArithmeticError` - Overflow when adding amount to total_amount
+    ///
+    /// # Safety Guarantees
+    /// - Amount validation: Must be positive (> 0)
+    /// - Vault status validation: Only Active vaults can be funded
+    /// - Overflow protection: Uses checked arithmetic for total_amount update
+    /// - Authorization: Funder must explicitly authorize the transaction
+    /// - Atomicity: All checks pass or entire operation fails
+    ///
+    /// # Examples
+    /// ```
+    /// // Fund a vault with 1000 tokens
+    /// factory.fund_vault(&env, vault_id, &funder_address, 1_000_0000000)?;
+    /// ```
+    pub fn fund_vault(
+        env: Env,
+        vault_id: u64,
+        funder: Address,
+        amount: i128,
+    ) -> Result<(), Error> {
+        vault::fund_vault(&env, vault_id, &funder, amount)
     }
 
     /// Update stream metadata (creator/admin only)
