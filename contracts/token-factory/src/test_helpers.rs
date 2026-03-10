@@ -124,11 +124,22 @@ impl<'a> ProposalBuilder<'a> {
             env,
             admin,
             action_type: ActionType::FeeChange,
-            payload: Bytes::new(env),
+            payload: fee_change_payload(env, 2_000_000, 750_000),
             start_offset: 100,
             duration: 86_400,
             eta_offset: 3_600,
         }
+    }
+
+    pub fn action_type(mut self, action_type: ActionType) -> Self {
+        self.action_type = action_type;
+        self.payload = match action_type {
+            ActionType::FeeChange => fee_change_payload(self.env, 2_000_000, 750_000),
+            ActionType::PauseContract | ActionType::UnpauseContract => pause_payload(self.env),
+            ActionType::TreasuryChange => treasury_change_payload(self.env, &Address::generate(self.env)),
+            ActionType::PolicyUpdate => policy_update_payload(self.env, 100_0000000, true, 86400),
+        };
+        self
     }
 
     pub fn payload(mut self, payload: Bytes) -> Self {
@@ -274,4 +285,37 @@ pub fn test_payload(env: &Env, bytes: &[u8]) -> Bytes {
         out.push_back(*b);
     }
     out
+}
+
+/// Create a valid FeeChange payload (32 bytes: base_fee + metadata_fee as i128 LE)
+pub fn fee_change_payload(env: &Env, base_fee: i128, metadata_fee: i128) -> Bytes {
+    let mut arr = [0u8; 32];
+    arr[0..16].copy_from_slice(&base_fee.to_le_bytes());
+    arr[16..32].copy_from_slice(&metadata_fee.to_le_bytes());
+    Bytes::from_array(env, &arr)
+}
+
+/// Create a valid TreasuryChange payload (32-byte address)
+pub fn treasury_change_payload(env: &Env, addr: &Address) -> Bytes {
+    use soroban_sdk::address_payload::AddressPayload;
+    let payload = addr.to_payload().expect("Address must have payload");
+    let arr: [u8; 32] = match &payload {
+        AddressPayload::ContractIdHash(b) => b.to_array(),
+        AddressPayload::AccountIdPublicKeyEd25519(b) => b.to_array(),
+    };
+    Bytes::from_array(env, &arr)
+}
+
+/// Create a valid PauseContract or UnpauseContract payload (empty)
+pub fn pause_payload(env: &Env) -> Bytes {
+    Bytes::new(env)
+}
+
+/// Create a valid PolicyUpdate payload (25 bytes)
+pub fn policy_update_payload(env: &Env, daily_cap: i128, allowlist: bool, period: u64) -> Bytes {
+    let mut arr = [0u8; 25];
+    arr[0..16].copy_from_slice(&daily_cap.to_le_bytes());
+    arr[16] = if allowlist { 1 } else { 0 };
+    arr[17..25].copy_from_slice(&period.to_le_bytes());
+    Bytes::from_array(env, &arr)
 }

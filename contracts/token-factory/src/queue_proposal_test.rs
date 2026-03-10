@@ -8,12 +8,13 @@
 //! - Premature queueing prevention
 //! - Successful queueing flow
 
+use crate::test_helpers::pause_payload;
 use crate::timelock::{
     create_proposal, vote_proposal, queue_proposal, get_proposal, initialize_timelock,
 };
 use crate::types::{ActionType, VoteChoice, Error, ProposalState};
 use crate::storage;
-use soroban_sdk::{testutils::Address as _, vec, Env};
+use soroban_sdk::{testutils::Address as _, Env};
 use soroban_sdk::testutils::{Ledger, Events};
 use soroban_sdk::Symbol;
 
@@ -41,7 +42,7 @@ fn create_test_proposal(
     let end_time = start_time + 86400;
     let eta = end_time + 7200;
     
-    let payload = vec![env, 1u8, 2u8, 3u8, 4u8, 5u8, 6u8, 7u8, 8u8];
+    let payload = pause_payload(env);
     
     create_proposal(
         env,

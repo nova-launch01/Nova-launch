@@ -8,13 +8,14 @@
 //! - Action dispatch (fee, pause, treasury)
 //! - Event emissions
 
+use crate::test_helpers::{fee_change_payload, pause_payload, policy_update_payload, treasury_change_payload};
 use crate::timelock::{
     create_proposal, vote_proposal, get_proposal, initialize_timelock,
     execute_proposal, queue_proposal,
 };
 use crate::types::{ActionType, VoteChoice, Error, ProposalState};
 use crate::storage;
-use soroban_sdk::{testutils::Address as _, vec, Env};
+use soroban_sdk::{testutils::Address as _, Env};
 use soroban_sdk::testutils::{Ledger, Events};
 use soroban_sdk::Symbol;
 
@@ -44,7 +45,15 @@ fn create_and_pass_proposal(
     let end_time = start_time + 86400;
     let eta = end_time + 7200; // 2 hour timelock after voting
     
-    let payload = vec![env, 1u8, 2u8, 3u8, 4u8, 5u8, 6u8, 7u8, 8u8];
+    let payload = match action_type {
+        ActionType::FeeChange => fee_change_payload(env, 2_000_000, 750_000),
+        ActionType::PauseContract | ActionType::UnpauseContract => pause_payload(env),
+        ActionType::TreasuryChange => {
+            let new_treasury = soroban_sdk::Address::generate(env);
+            treasury_change_payload(env, &new_treasury)
+        }
+        ActionType::PolicyUpdate => policy_update_payload(env, 100_0000000, true, 86400),
+    };
     
     let proposal_id = create_proposal(
         env,
